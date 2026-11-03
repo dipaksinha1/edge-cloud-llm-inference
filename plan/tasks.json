@@ -34,8 +34,8 @@
         "T001"
       ],
       "size": "S",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "Tolerant GSM8K/MMLU extraction, 63 grading tests; round-2 review findings fixed after the 2-round review limit (no third review)."
     },
     {
       "id": "T003",
