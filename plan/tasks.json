@@ -19,8 +19,8 @@
       ],
       "depends_on": [],
       "size": "M",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "Mock edge pipeline + verify.sh working; usage errors exit 1; non-mock clients raise NotImplementedError until T004/T006."
     },
     {
       "id": "T002",
