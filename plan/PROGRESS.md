@@ -1,0 +1,22 @@
+# Progress
+
+## Project state
+- Phase: **planning done, no application code yet.** Next: T001 (walking skeleton).
+- Spec: plan/SPEC.md (R1–R13, N1–N6). Architecture: plan/ARCHITECTURE.md. ADRs 0001–0006.
+- 13 tasks in 4 milestones: M1 mock pipeline (T001–T003) · M2 real backends (T004–T007) · M3 hybrid + random (T008–T010) · M4 analysis + run guide (T011–T013).
+- Workflow: one task per fresh Claude Code cloud session via /next-task, commits on `build`, pushed after each task. Milestones merged to `main` via PR reviewed by Dk.
+- Real Ollama/Groq can't be reached from cloud sessions. They're tested via fake transports and verified on Dk's Mac with docs/MAC_CHECKLIST.md (T013).
+- Deadlines: cloud credit expires 2026-11-05 02:59 EST · final presentation 2026-12-02/09 · report due 2026-12-10.
+- Open question Q1 (router threshold tuning) is deferred until real results exist.
+
+---
+
+## 2026-11-03 · PLAN · Spec, architecture and task breakdown · DONE
+- Did: adapted Dk's kickoff/architect/next-task/replan commands + task-reviewer agent for Claude Code cloud sessions. Wrote SPEC from the proposal, proposal report and agreed decisions (Groq, 3 Ollama models, LR + 3-sample router, random baseline, tool-agnostic network degradation). Wrote ARCHITECTURE with exact contracts, 6 ADRs, CLAUDE.md, 13 task briefs.
+- Decisions: integration branch `build` (ADR 0006). Local `run-tasks.sh` dropped (it would bill a local plan, not the cloud credit). `.claude/settings.json` allow-list left for Dk to add (auto-mode blocked writing it).
+- Verified: cold-audit subagent reviewed the plan and the fixes were applied (see the next entry).
+
+## 2026-11-03 · PLAN · Cold audit fixes · DONE
+- Did: an independent subagent audited SPEC/ARCH/tasks/briefs and found 14 issues. All real ones were fixed.
+- Fixed: one smoke command and file set fixed in ARCH §8 (router trained as qwen2.5:3b, `.verify_tmp` wiped each run). `data --mock` now feeds run/router through the normal loader. Mock stage-2 samples can disagree. `safe_name()` for Windows-safe file names. Fixture 8 → 24 (T001 → T003). qid format unified. `prepare` is a non-abstract no-op. Retries: 5 retries, 6 attempts. Added StrategyError/StrategyContext/factory registry/BudgetedClient contracts. T006 now depends on T005. `--mock` limited to data/router/run. Seeds passed to backends. SUBJECT_GROUPS source named. fig3 side-file. `build_parser()` everywhere.
+- Not changed: T001 stays size M (the fixture was cut to 8 questions to keep it within one session).

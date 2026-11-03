@@ -1,0 +1,218 @@
+{
+  "milestones": {
+    "M1": "Mock pipeline runs end to end (edge-only, graded, real dataset files)",
+    "M2": "Real backends: Ollama + Groq clients, memory, robust resumable runner",
+    "M3": "Hybrid router + random baseline",
+    "M4": "Analysis outputs + run guide, ready for the Mac runs"
+  },
+  "tasks": [
+    {
+      "id": "T001",
+      "title": "Walking skeleton: edge-only run end to end in mock mode",
+      "milestone": "M1",
+      "brief": "plan/tasks/T001-walking-skeleton.md",
+      "requirements": [
+        "R2",
+        "R7",
+        "R9",
+        "R12"
+      ],
+      "depends_on": [],
+      "size": "M",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "id": "T002",
+      "title": "Robust answer grading for GSM8K and MMLU",
+      "milestone": "M1",
+      "brief": "plan/tasks/T002-grading.md",
+      "requirements": [
+        "R8"
+      ],
+      "depends_on": [
+        "T001"
+      ],
+      "size": "S",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "id": "T003",
+      "title": "Dataset builder with seeded, disjoint test and calibration sets",
+      "milestone": "M1",
+      "brief": "plan/tasks/T003-dataset-builder.md",
+      "requirements": [
+        "R1",
+        "R12"
+      ],
+      "depends_on": [
+        "T001"
+      ],
+      "size": "M",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "id": "T004",
+      "title": "Ollama client with streaming timing",
+      "milestone": "M2",
+      "brief": "plan/tasks/T004-ollama-client.md",
+      "requirements": [
+        "R2",
+        "R7"
+      ],
+      "depends_on": [
+        "T001"
+      ],
+      "size": "M",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "id": "T005",
+      "title": "Memory sampler and run metadata",
+      "milestone": "M2",
+      "brief": "plan/tasks/T005-memory-and-metadata.md",
+      "requirements": [
+        "R7",
+        "R13"
+      ],
+      "depends_on": [
+        "T004"
+      ],
+      "size": "S",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "id": "T006",
+      "title": "Groq cloud client and cloud-only strategy",
+      "milestone": "M2",
+      "brief": "plan/tasks/T006-cloud-client.md",
+      "requirements": [
+        "R3",
+        "R7"
+      ],
+      "depends_on": [
+        "T005"
+      ],
+      "size": "M",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "id": "T007",
+      "title": "Resumable runner, error rows, --all, --limit and cloud budget",
+      "milestone": "M2",
+      "brief": "plan/tasks/T007-resumable-runner.md",
+      "requirements": [
+        "R9",
+        "R10"
+      ],
+      "depends_on": [
+        "T002",
+        "T005",
+        "T006"
+      ],
+      "size": "M",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "id": "T008",
+      "title": "Router features and training command",
+      "milestone": "M3",
+      "brief": "plan/tasks/T008-router-training.md",
+      "requirements": [
+        "R5"
+      ],
+      "depends_on": [
+        "T002",
+        "T003",
+        "T007"
+      ],
+      "size": "M",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "id": "T009",
+      "title": "Hybrid strategy with two-stage router",
+      "milestone": "M3",
+      "brief": "plan/tasks/T009-hybrid-strategy.md",
+      "requirements": [
+        "R4",
+        "R7"
+      ],
+      "depends_on": [
+        "T008"
+      ],
+      "size": "M",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "id": "T010",
+      "title": "Random-router baseline",
+      "milestone": "M3",
+      "brief": "plan/tasks/T010-random-router.md",
+      "requirements": [
+        "R6"
+      ],
+      "depends_on": [
+        "T009"
+      ],
+      "size": "S",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "id": "T011",
+      "title": "Analysis: summary table",
+      "milestone": "M4",
+      "brief": "plan/tasks/T011-analysis-summary.md",
+      "requirements": [
+        "R11"
+      ],
+      "depends_on": [
+        "T010"
+      ],
+      "size": "S",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "id": "T012",
+      "title": "Analysis: report figures",
+      "milestone": "M4",
+      "brief": "plan/tasks/T012-analysis-figures.md",
+      "requirements": [
+        "R11"
+      ],
+      "depends_on": [
+        "T011"
+      ],
+      "size": "M",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "id": "T013",
+      "title": "README run guide and Mac real-backend checklist",
+      "milestone": "M4",
+      "brief": "plan/tasks/T013-readme-run-guide.md",
+      "requirements": [
+        "R2",
+        "R3",
+        "R9"
+      ],
+      "depends_on": [
+        "T012"
+      ],
+      "size": "S",
+      "status": "todo",
+      "notes": ""
+    }
+  ]
+}
