@@ -66,8 +66,8 @@
         "T001"
       ],
       "size": "M",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "OllamaClient streams /api/generate (TTFT at first non-empty chunk, tps from eval_count/eval_duration, options.seed like MockClient); make_client edge real. Real Ollama unverified here, check on Mac (T013)."
     },
     {
       "id": "T005",

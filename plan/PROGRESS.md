@@ -1,7 +1,7 @@
 # Progress
 
 ## Project state
-- Phase: **M1 complete** (T001–T003 done). Next: PR build → main for M1, then T004 (Ollama client).
+- Phase: **M1 complete** (T001–T003), **M2 started** (T004 done). Next: T005 (memory sampler + run metadata). PR build → main for M1 is still pending.
 - Spec: plan/SPEC.md (R1–R13, N1–N6). Architecture: plan/ARCHITECTURE.md. ADRs 0001–0006.
 - 13 tasks in 4 milestones: M1 mock pipeline (T001–T003) · M2 real backends (T004–T007) · M3 hybrid + random (T008–T010) · M4 analysis + run guide (T011–T013).
 - Workflow: one task per fresh Claude Code cloud session via /next-task, commits on `build`, pushed after each task. Milestones merged to `main` via PR reviewed by Dk.
@@ -41,3 +41,10 @@
 - Gotchas: `test_run_edge_mock.py::test_unimplemented_options_exit_1` (`data.main([]) == 1`) now passes through the offline loader guard. It tests loader failure, not an unimplemented option, and should be renamed in a /replan.
 - Verified: verify.sh PASS. AC1 is covered by the counts/disjoint and text-overlap tests, AC2 by a CLI byte-compare with the same and a different seed, AC3 by a failing-loader test (exit 1, names cais/mmlu, old files untouched). A real run here was blocked by a Hugging Face 403 and exited 1 naming gsm8k. AC4 by a fixture test plus verify.sh, AC5 by a round-trip test. Reviewer: PASS, no blocking issues.
 - Follow-ups: the real download is unverified in a cloud session, so check it on the Mac (T013). The two files are renamed one after the other, so if the second write fails they can end up mismatched.
+
+## 2026-11-03 · T004 · Ollama client with streaming timing · DONE
+- Did: `clients/ollama.py` OllamaClient: streams `POST /api/generate` with `iter_lines()`. `check()` calls `GET /api/tags` and treats a name without a tag as `:latest`. `make_client("edge", mock=False)` returns it. 14 tests in tests/test_ollama.py.
+- Decisions: `generate()` has no seed parameter, so it sends `options.seed` the way MockClient does (settings.seed at temperature 0, seed + k for the k-th sampled call of a prompt). total_s is taken at the `done` chunk. If `eval_duration` is missing, tokens/s falls back to tokens / (total − TTFT). A mid-stream `{"error"}` chunk, invalid JSON or a missing done chunk raise ClientError.
+- Gotchas: run.py already called `check()` and caught ClientUnavailable, so AC5 only needed a test. This session ran T003 and T004 back to back because the user asked for it.
+- Verified: verify.sh PASS. AC1 covered by a streaming test (text, 30 tokens, 20 tok/s, ttft ≤ total). AC2 by a test with a controlled perf_counter and an empty first chunk (ttft 2.0, not 0.5). AC3 by tests comparing the exact messages. AC4 by HTTP 500 and ReadTimeout tests. AC5 by run.main with a patched factory (exit 1, only /api/tags requested, no rows). A real non-mock run here exits 1 with the "not running" message. Reviewer: PASS, no blocking issues.
+- Follow-ups: T009 must count stage-2 samples the same way (the first sample reuses settings.seed). Real Ollama timing still needs checking on the Mac (T013).

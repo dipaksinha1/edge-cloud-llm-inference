@@ -6,9 +6,18 @@ from typing import Literal
 
 from eclm.clients.base import ClientError, ClientUnavailable, ModelClient
 from eclm.clients.mock import MockClient, mock_accuracy
+from eclm.clients.ollama import OllamaClient
 from eclm.config import Settings
 
-__all__ = ["ClientError", "ClientUnavailable", "MockClient", "ModelClient", "make_client", "mock_accuracy"]
+__all__ = [
+    "ClientError",
+    "ClientUnavailable",
+    "MockClient",
+    "ModelClient",
+    "OllamaClient",
+    "make_client",
+    "mock_accuracy",
+]
 
 
 def make_client(
@@ -26,5 +35,5 @@ def make_client(
     if mock:
         return MockClient(name, kind, mock_accuracy(name, kind), settings.seed)
     if kind == "edge":
-        raise NotImplementedError("T004")
+        return OllamaClient(name, settings)
     raise NotImplementedError("T006")
