@@ -1,7 +1,7 @@
 # Progress
 
 ## Project state
-- Phase: **M1 complete** (T001–T003), **M2 complete** (T004–T007). **M3 complete** (T008–T010). Next: T011 (analysis summary table). PRs build → main for M1/M2 are still pending.
+- Phase: **M1 complete** (T001–T003), **M2 complete** (T004–T007). **M3 complete** (T008–T010). M4 started: T011 done. Next: T012 (report figures). PRs build → main for M1/M2 are still pending.
 - Spec: plan/SPEC.md (R1–R13, N1–N6). Architecture: plan/ARCHITECTURE.md. ADRs 0001–0006.
 - 13 tasks in 4 milestones: M1 mock pipeline (T001–T003) · M2 real backends (T004–T007) · M3 hybrid + random (T008–T010) · M4 analysis + run guide (T011–T013).
 - Workflow: one task per fresh Claude Code cloud session via /next-task, commits on `build`, pushed after each task. Milestones merged to `main` via PR reviewed by Dk.
@@ -89,3 +89,10 @@
 - Existing tests changed (user approved in-session): in test_run_resume.py the `--all` file set now includes random, and the degraded count goes from 5 to 6. AC4 requires both. The brief should have listed them.
 - Verified: verify.sh PASS. AC1 is covered by an exact seeded-set test plus a CLI test (3 cloud rows, the same 3 on a fresh rerun and on a resume from 4 rows). AC2 by a handcrafted degraded hybrid CSV (1/3 → 4 of 12, a normal-network decoy ignored) and an `--all` test. AC3 by an exit-1 test that checks the message names `--ratio` and the file, with no CSV or meta left. AC4/5 by verify.sh. A manual CLI run agreed. Reviewer: PASS, no blocking issues.
 - Follow-ups: the resolved ratio isn't recorded in meta.json, and if the hybrid CSV changes between a run and its resume, k (and so the cloud set) changes. Worth logging it in meta (/replan).
+
+## 2026-11-03 · T011 · Analysis: summary table · DONE
+- Did: `analyze.py` with `load_results` (every results/*.csv except summary.csv, typed columns; a CSV without the result columns → exit 1), `summarize` (SUMMARY_COLUMNS in the brief's order), `to_markdown` (3 decimals, NaN blank) and the CLI that writes results/summary.csv and summary.md. verify.sh runs analyze and checks summary rows == result CSVs (8) and that summary.md isn't empty. 14 tests in tests/test_analyze.py.
+- Decisions: error rows count in n, accuracy (as wrong), parse_fail_rate and error_rate, but not in the ttft/total/tps/mem means. mem_peak_mean averages only rows that have a peak (edge rows), and it's blank for cloud. A group with no rows for a dataset gets NaN (blank). Rows are sorted by ARCH §10 strategy order, then edge_model, then normal before degraded. Added `--config` (not in the ARCH §5 CLI contract) so the default results dir comes from config.yaml like the other CLIs; record it in /replan. `--figures-dir` is parsed but unused until T012. No tabulate dependency: the Markdown is written by hand.
+- Gotchas: this session also ran T010 first, because the user invoked /next-task twice.
+- Verified: verify.sh PASS. AC1 by hand-computed edge/cloud/hybrid groups (every column). AC2 by an error row with outlier timings (means unchanged, accuracy and error_rate 0.5) plus an all-error group. AC3 by four empty cases (missing dir, empty dir, header-only, summary-only) plus a manual CLI run (exit 1, "no results found"). AC4/5 by verify.sh. Reviewer: PASS, and non-blocking item 3 (malformed CSV) was fixed.
+- Follow-ups: the report should say that hybrid/random mem_peak_mean covers edge rows only. In mock mode the degraded network doesn't change edge timings (MockClient behaviour), so check it on the Mac.

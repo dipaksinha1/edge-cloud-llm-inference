@@ -179,8 +179,8 @@
         "T010"
       ],
       "size": "S",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "analyze.py: load_results/summarize/summary.csv+md; extra --config flag (defaults from config.yaml) to record in ARCH via /replan."
     },
     {
       "id": "T012",
