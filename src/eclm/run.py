@@ -21,7 +21,7 @@ from eclm.data import TEST_FILE, load_questions
 from eclm.grading import extract_answer, is_correct
 from eclm.metrics import system_info
 from eclm.results import ResultWriter, done_qids, result_path
-from eclm.strategies import STRATEGIES, StrategyContext, StrategyError
+from eclm.strategies import STRATEGIES, Strategy, StrategyContext, StrategyError, StrategyUnavailable
 from eclm.types import Generation, Question, Result
 
 log = logging.getLogger("eclm.run")
@@ -55,12 +55,16 @@ def now_utc() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
-def combine_timings(gens: list[Generation]) -> tuple[float, float]:
-    """(ttft_s, total_s) for a row, per ARCHITECTURE §6: the answering call is the last one."""
+def combine_timings(gens: list[Generation], answer_index: int | None = None) -> tuple[float, float]:
+    """(ttft_s, total_s) for a row, per ARCHITECTURE §6.
+
+    total = sum of every call's total. ttft = totals of the calls before the answering call + its TTFT.
+    The answering call is the last one unless `answer_index` says otherwise (hybrid kept on the edge).
+    """
     if not gens:
         return 0.0, 0.0
-    before = sum(g.total_s for g in gens[:-1])
-    return before + gens[-1].ttft_s, before + gens[-1].total_s
+    i = len(gens) - 1 if answer_index is None else answer_index
+    return sum(g.total_s for g in gens[:i]) + gens[i].ttft_s, sum(g.total_s for g in gens)
 
 
 def _fmt(value: float | None) -> str:
@@ -80,8 +84,9 @@ def build_result(
     extra: dict[str, Any],
     error: str = "",
 ) -> Result:
-    ttft, total = combine_timings(gens)
-    final = gens[-1] if gens else None
+    answer_index = extra.get("answer_index") if not error else None
+    ttft, total = combine_timings(gens, answer_index)
+    final = (gens[-1] if answer_index is None else gens[answer_index]) if gens else None
     predicted = extra.get("predicted")
     if predicted is None and text:
         predicted = extract_answer(text, q.dataset, q.choices)
@@ -216,13 +221,13 @@ def _read_run_id(meta_file: Path) -> str | None:
 
 def run_combo(
     combo: Combo,
+    strategy: Strategy,
     ctx: StrategyContext,
     args: argparse.Namespace,
     settings: Settings,
     questions: list[Question],
 ) -> int:
     """Answer every question of `questions` not yet in this combo's CSV. Returns 0, or 2 if the budget ran out."""
-    strategy = STRATEGIES[combo.strategy](ctx)
     edge_model = ctx.edge.name if ctx.edge is not None else (combo.edge_model or "")
     cloud_model = ctx.cloud.name if ctx.cloud is not None else ""
     path = result_path(settings.results_dir, strategy.name, combo.edge_model, args.network)
@@ -279,13 +284,14 @@ def run_combo(
 def run_all(args: argparse.Namespace, settings: Settings, questions: list[Question]) -> int:
     combos = plan_combos(args, settings)
     clients = _Clients(settings, args.mock)
-    try:  # check every backend before the first question
+    try:  # check every backend (and e.g. the hybrid's router file) before the first question
         contexts = [_context(c, args, settings, clients) for c in combos]
-    except ClientUnavailable as exc:
+        strategies = [STRATEGIES[c.strategy](ctx) for c, ctx in zip(combos, contexts, strict=True)]
+    except (ClientUnavailable, StrategyUnavailable) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
-    for combo, ctx in zip(combos, contexts, strict=True):
-        code = run_combo(combo, ctx, args, settings, questions)
+    for combo, strategy, ctx in zip(combos, strategies, contexts, strict=True):
+        code = run_combo(combo, strategy, ctx, args, settings, questions)
         if code != 0:
             return code
     return 0

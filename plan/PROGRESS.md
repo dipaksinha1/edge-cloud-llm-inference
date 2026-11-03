@@ -1,7 +1,7 @@
 # Progress
 
 ## Project state
-- Phase: **M1 complete** (T001–T003), **M2 complete** (T004–T007). M3 started: T008 done. Next: T009 (hybrid strategy). PRs build → main for M1/M2 are still pending.
+- Phase: **M1 complete** (T001–T003), **M2 complete** (T004–T007). M3 started: T008, T009 done. Next: T010 (random router). PRs build → main for M1/M2 are still pending.
 - Spec: plan/SPEC.md (R1–R13, N1–N6). Architecture: plan/ARCHITECTURE.md. ADRs 0001–0006.
 - 13 tasks in 4 milestones: M1 mock pipeline (T001–T003) · M2 real backends (T004–T007) · M3 hybrid + random (T008–T010) · M4 analysis + run guide (T011–T013).
 - Workflow: one task per fresh Claude Code cloud session via /next-task, commits on `build`, pushed after each task. Milestones merged to `main` via PR reviewed by Dk.
@@ -75,3 +75,10 @@
 - Decisions: `train_router` takes an extra keyword-only `mock=False` so MockClient prompts carry the gold marker (ARCH §5 should be updated in a /replan). n_numbers, n_math_ops and max_number_digits use the question text only; n_words adds the MMLU choices. Op symbols are counted literally, so the '-' in "well-known" counts too. `RouterModel.train_accuracy` is reported but not saved. `load()` rejects a file trained on a different FEATURES list. "Share predicted hard" uses score > threshold (strict).
 - Verified: verify.sh PASS. AC1 by 3 hand-checked vectors plus group-count tests. AC2 by a scripted fake edge that is wrong on long questions. AC3 by a save/load test over 24 probes. AC4 by a CLI run with no test file, and a spy test with a poison test file that shows only calibration is opened. AC5 by verify.sh. The mock calibration has both classes for all 3 edge models (tested). Reviewer: PASS, no blocking issues.
 - Follow-ups: T009's Router.decide should use the same strict `>` against the threshold. Mock training accuracy for qwen2.5:3b is 0.75, with 25% of questions predicted hard.
+
+## 2026-11-03 · T009 · Hybrid strategy with two-stage router · DONE
+- Did: `Router.decide` + `largest_group` in router.py. `Hybrid`, `MeteredClient` (peak memory per edge sample), `StrategyUnavailable` and the `hybrid` factory in strategies.py. run.py: `combine_timings(gens, answer_index)`, and all strategies are built before the first question so a missing or mismatched router exits 1 with no rows. verify.sh asserts the hybrid CSV and meta. Scripted fakes (`ScriptedClient`, `StubRouterModel`) are in tests/conftest.py. 21 tests in tests/test_hybrid.py.
+- Decisions: `Router` takes an extra keyword-only `mock=False` (prompt gold marker, like train_router). Hybrid passes `answer_index` in extra, and build_result takes TTFT, output_tokens and tokens/s from the answering call (§6 says "final call", read here as the answering call). A router file trained for another edge model also exits 1. Strict `>` against the threshold.
+- Existing tests changed (user approved in-session): test_run_resume.py's `mockdata` fixture now trains the mock router, and the expected `--all` file set and degraded count (4 → 5) include hybrid. The brief should have listed them.
+- Verified: verify.sh PASS. AC1–AC4 by scripted-client tests with fixed timings (TTFT 1.2 edge-kept at sample 2, 6.5 escalated, total 10.0). AC5 by verify.sh plus a mock-run test asserting a stage-2 row (the smoke CSV has 10 edge, 1 stage-1, 1 stage-2). A manual CLI run with no router exits 1 with the hint. Reviewer: PASS, no blocking issues.
+- Follow-ups: a failed edge sample's time is left out of total_s and edge_calls (matches §7 "completed calls", but understates latency on a timeout). T010's random factory is now built before any combo runs, so it should read the hybrid ratio in `prepare()`, not in the factory. In /replan, record Router's `mock=` keyword and the answering-call reading in ARCH §5/§6.

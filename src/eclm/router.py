@@ -21,10 +21,10 @@ from sklearn.linear_model import LogisticRegression
 from eclm.clients import ClientError, ClientUnavailable, ModelClient, make_client
 from eclm.config import ConfigError, Settings, load_settings
 from eclm.data import CALIBRATION_FILE, load_questions
-from eclm.grading import extract_answer, is_correct
+from eclm.grading import answers_agree, extract_answer, is_correct
 from eclm.prompts import build_prompt
 from eclm.results import safe_name
-from eclm.types import Question
+from eclm.types import Decision, Generation, Question
 
 log = logging.getLogger("eclm.router")
 
@@ -178,6 +178,54 @@ class RouterModel:
 def router_path(settings: Settings, edge_model: str) -> Path:
     """models/router_<safe name>.joblib"""
     return Path(settings.models_dir) / f"router_{safe_name(edge_model)}.joblib"
+
+
+def largest_group(answers: list[str | None], dataset: str) -> int:
+    """Size of the largest group of equal answers (grading's notion of equal); 0 if none parse."""
+    parsed = [a for a in answers if a is not None]
+    return max((sum(is_correct(b, a, dataset) for b in parsed) for a in parsed), default=0)
+
+
+class Router:
+    """Two-stage router (ADR 0004). Stage 1: difficulty score > threshold -> cloud.
+    Stage 2: `samples` edge calls at `sample_temperature`; >= `min_agree` equal answers keep the edge answer.
+
+    `mock=True` builds prompts with the hidden gold marker, as MockClient needs (like train_router).
+    """
+
+    def __init__(self, model: RouterModel, edge: ModelClient, settings: Settings, *, mock: bool = False) -> None:
+        self.model = model
+        self.edge = edge
+        self.settings = settings
+        self.mock = mock
+
+    def decide(self, q: Question) -> Decision:
+        cfg = self.settings.router
+        difficulty = self.model.predict_hard(q)
+        if difficulty > cfg.threshold:
+            return Decision(route="cloud", stage=1, difficulty=difficulty, agreement=None,
+                            edge_generations=(), edge_answer=None)
+        prompt = build_prompt(q, mock=self.mock)
+        gens: list[Generation] = []
+        answers: list[str | None] = []
+        for _ in range(cfg.samples):
+            try:
+                gen = self.edge.generate(
+                    prompt, temperature=cfg.sample_temperature, max_tokens=self.settings.generation.max_tokens
+                )
+            except ClientError as exc:  # counts as an unparseable answer (ARCHITECTURE §7)
+                log.warning("edge sample failed on %s (counted as unparseable): %s", q.qid, exc)
+                answers.append(None)
+                continue
+            gens.append(gen)
+            answers.append(extract_answer(gen.text, q.dataset, q.choices))
+        majority = answers_agree(answers, q.dataset, cfg.min_agree)
+        agreement = largest_group(answers, q.dataset)
+        if majority is None:
+            return Decision(route="cloud", stage=2, difficulty=difficulty, agreement=agreement,
+                            edge_generations=tuple(gens), edge_answer=None)
+        return Decision(route="edge", stage=None, difficulty=difficulty, agreement=agreement,
+                        edge_generations=tuple(gens), edge_answer=majority)
 
 
 def edge_labels(settings: Settings, edge: ModelClient, calibration: list[Question], *, mock: bool = False) -> list[int]:

@@ -149,8 +149,8 @@
         "T008"
       ],
       "size": "M",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "Router/Hybrid/MeteredClient done; --all now builds strategies before any question; 3 test_run_resume tests updated (user-approved) to include hybrid."
     },
     {
       "id": "T010",

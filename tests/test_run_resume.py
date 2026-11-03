@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 import yaml
 
-from eclm import data, run
+from eclm import data, router, run
 from eclm.clients import BudgetedClient, BudgetExceeded, ClientError, MockClient
 from eclm.config import load_settings
 from eclm.results import done_qids
@@ -41,6 +41,7 @@ def _set_config(workdir: Path, section: str, key: str, value: Any) -> None:
 @pytest.fixture
 def mockdata(workdir: Path) -> Path:
     assert data.main(["--mock"]) == 0
+    assert router.main(["train", "--edge-model", "qwen2.5:3b", "--mock"]) == 0  # --all includes hybrid (T009)
     return workdir
 
 
@@ -205,7 +206,7 @@ def test_all_runs_every_edge_model_then_cloud(mockdata: Path) -> None:
     results = mockdata / "results"
     n = len(_qids(mockdata))
     expected = {"edge__qwen2.5-3b__normal", "edge__qwen2.5-0.5b__normal", "edge__llama3.2-1b__normal",
-                "cloud__none__normal"}
+                "cloud__none__normal", "hybrid__qwen2.5-3b__normal"}
     assert {p.name for p in results.iterdir()} == {f"{s}{ext}" for s in expected for ext in (".csv", ".meta.json")}
     for stem in expected:
         rows = _rows(results / f"{stem}.csv")
@@ -251,7 +252,7 @@ def test_degraded_never_overwrites_normal(mockdata: Path) -> None:
     assert run.main([*EDGE, "--network", "degraded"]) == 0
     assert {p.name: p.read_bytes() for p in results.iterdir() if "__normal" in p.name} == before
     degraded = [p for p in results.iterdir() if p.name.endswith("__degraded.csv")]
-    assert len(degraded) == 4
+    assert len(degraded) == 5
     for p in degraded:
         assert {r["network"] for r in _rows(p)} == {"degraded"}
 
