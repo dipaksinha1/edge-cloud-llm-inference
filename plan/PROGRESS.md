@@ -1,7 +1,7 @@
 # Progress
 
 ## Project state
-- Phase: **M1 complete** (T001–T003), **M2 in progress** (T004–T006 done). Next: T007 (resumable runner, error rows, --all, --limit, budget), which completes M2. PR build → main for M1 is still pending.
+- Phase: **M1 complete** (T001–T003), **M2 complete** (T004–T007). Next: T008 (router features and training), starting M3. PRs build → main for M1/M2 are still pending.
 - Spec: plan/SPEC.md (R1–R13, N1–N6). Architecture: plan/ARCHITECTURE.md. ADRs 0001–0006.
 - 13 tasks in 4 milestones: M1 mock pipeline (T001–T003) · M2 real backends (T004–T007) · M3 hybrid + random (T008–T010) · M4 analysis + run guide (T011–T013).
 - Workflow: one task per fresh Claude Code cloud session via /next-task, commits on `build`, pushed after each task. Milestones merged to `main` via PR reviewed by Dk.
@@ -62,3 +62,10 @@
 - Gotchas: installed openai (3.43) uses `httpx2` and types `http_client` as `httpx2.Client`, so the injected `httpx.Client` is passed with `cast(Any, ...)` and works by duck typing. A stale `.mypy_cache` can hide the type error (cold cache passed, warm failed).
 - Verified: verify.sh PASS (twice). AC1 covered by an SSE test with a controlled clock (40 tokens, tps = 40/(1.7-0.5), empty first chunk). AC2 by recorded sleeps [1,2] and six 429/503s → ClientError. AC3 by an exact-message test, run exit 1 with no CSV, and a sentinel key absent from stdout, stderr, logs, CSV and meta. AC4 by a mock run test plus smoke. Reviewer: PASS, no blocking issues.
 - Follow-ups: real Groq (model id, rate limits) still needs checking on the Mac (T013).
+
+## 2026-11-03 · T007 · Resumable runner, error rows, --all, --limit and cloud budget · DONE
+- Did: `StrategyError`, `StrategyContext` and the `STRATEGIES` registry (edge/cloud register factories and wrap ClientError). `BudgetedClient`/`BudgetExceeded` in clients/base.py. run.py: `plan_combos` (--all in ARCH §10 order, hybrid/random only if registered), one shared client cache, resume via `done_qids`, error rows, `--limit`, exit 2 on budget, tqdm starting from done rows. verify.sh smoke now runs `--all` plus the degraded edge step. 19 tests in tests/test_run_resume.py.
+- Decisions: a resumed run keeps the existing meta.json and reuses its run_id, so all rows match the meta (it warns if the meta is missing). `--all` checks every backend before the first question, and one BudgetedClient covers the whole process. `--all` combined with `--strategy`/`--edge-model`, or `--limit < 1`, exits 1. Every attempted cloud call counts against the budget, failed ones included.
+- Existing test changed (user approved in-session): test_run_edge_mock.py:74 now asserts `--strategy random` exits 1 instead of `--all`, because AC4 makes `--all` succeed. The brief should have listed it.
+- Verified: verify.sh PASS. AC1 by a KeyboardInterrupt-after-3 test, then a rerun with exact qids. AC2 by a ClientError-on-one-qid test (edge and cloud) plus a completed-calls StrategyError test. AC3 by budget=3 → exit 2 with 3 rows, then a rerun, then completion; a manual CLI run agreed. AC4 by smoke and a file-set test. AC5 by a byte-compare of the normal files. Reviewer: PASS, and non-blocking items 2 and 3 were fixed.
+- Follow-ups: `prepare()` receives the full (limited) question list, not only the remaining ones, which T010 needs to know. Earlier PROGRESS entries have a duplicated T001/PLAN block inside T003 (left as is).

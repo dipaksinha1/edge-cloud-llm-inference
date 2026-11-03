@@ -71,7 +71,7 @@ def test_missing_data_file_exits_1(workdir: Path) -> None:
 def test_unimplemented_options_exit_1(workdir: Path) -> None:
     data.main(["--mock"])
     assert run.main(["--strategy", "hybrid", "--network", "normal", "--mock"]) == 1
-    assert run.main(["--all", "--network", "normal", "--mock"]) == 1
+    assert run.main(["--strategy", "random", "--network", "normal", "--mock"]) == 1
     assert data.main([]) == 1
 
 

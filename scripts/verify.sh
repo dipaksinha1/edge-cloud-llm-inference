@@ -36,15 +36,15 @@ step "smoke: data --mock" "$PY" -m eclm.data --mock
 for D in data/test_questions.jsonl data/calibration_questions.jsonl; do
   check "smoke: $D has 12 lines" test -f "$D" -a "$(wc -l < "$D" 2>/dev/null || echo 0)" -eq 12
 done
-step "smoke: run edge"    "$PY" -m eclm.run --strategy edge --edge-model qwen2.5:3b --network normal --mock
+step "smoke: run --all normal" "$PY" -m eclm.run --all --network normal --mock
+step "smoke: run edge degraded" "$PY" -m eclm.run --strategy edge --edge-model qwen2.5:3b --network degraded --mock
 N_TEST=$(wc -l < data/test_questions.jsonl)
 check "smoke: test set not empty" test "$N_TEST" -gt 0
-F=results/edge__qwen2.5-3b__normal.csv
-check "smoke: $F rows" test -f "$F" -a "$(rows "$F" 2>/dev/null || echo 0)" -eq "$N_TEST"
-check "smoke: ${F%.csv}.meta.json" test -s "${F%.csv}.meta.json"
-step "smoke: run cloud"   "$PY" -m eclm.run --strategy cloud --network normal --mock
-F=results/cloud__none__normal.csv
-check "smoke: $F rows" test -f "$F" -a "$(rows "$F" 2>/dev/null || echo 0)" -eq "$N_TEST"
-check "smoke: ${F%.csv}.meta.json" test -s "${F%.csv}.meta.json"
+for F in results/edge__qwen2.5-3b__normal.csv results/edge__qwen2.5-0.5b__normal.csv \
+         results/edge__llama3.2-1b__normal.csv results/cloud__none__normal.csv \
+         results/edge__qwen2.5-3b__degraded.csv; do
+  check "smoke: $F rows" test -f "$F" -a "$(rows "$F" 2>/dev/null || echo 0)" -eq "$N_TEST"
+  check "smoke: ${F%.csv}.meta.json" test -s "${F%.csv}.meta.json"
+done
 
 echo "VERIFY: PASS"

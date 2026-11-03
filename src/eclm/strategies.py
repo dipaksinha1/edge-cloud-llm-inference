@@ -4,14 +4,55 @@ from __future__ import annotations
 
 import os
 from abc import ABC, abstractmethod
-from dataclasses import replace
+from collections.abc import Callable
+from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import Any
 
-from eclm.clients.base import ModelClient
+from eclm.clients.base import ClientError, ModelClient
 from eclm.config import Settings
 from eclm.metrics import MemorySampler
 from eclm.prompts import build_prompt
 from eclm.types import Generation, Question
+
+
+class StrategyError(Exception):
+    """A ClientError inside answer(). Keeps the calls that did complete so the runner can record them (§7)."""
+
+    def __init__(self, cause: Exception, generations: list[Generation], extra: dict[str, Any]) -> None:
+        super().__init__(f"{type(cause).__name__}: {cause}")
+        self.cause = cause
+        self.generations = list(generations)
+        self.extra = dict(extra)
+
+
+@dataclass
+class StrategyContext:
+    """Everything a strategy factory may need. run.py builds the clients (cloud wrapped in BudgetedClient)."""
+
+    settings: Settings
+    edge_model: str | None
+    network: str
+    mock: bool
+    results_dir: Path
+    ratio: float | None
+    edge: ModelClient | None
+    cloud: ModelClient | None
+
+
+StrategyFactory = Callable[[StrategyContext], "Strategy"]
+STRATEGIES: dict[str, StrategyFactory] = {}
+
+
+def register(name: str, factory: StrategyFactory) -> None:
+    """Make a strategy available to `run --strategy <name>` and `run --all`."""
+    STRATEGIES[name] = factory
+
+
+def _need(client: ModelClient | None, side: str, strategy: str) -> ModelClient:
+    if client is None:
+        raise ValueError(f"strategy {strategy!r} needs an {side} client")
+    return client
 
 
 class Strategy(ABC):
@@ -52,12 +93,15 @@ class EdgeOnly(Strategy):
         self.edge = edge
 
     def answer(self, q: Question) -> tuple[str, list[Generation], dict[str, Any]]:
-        gen = self.edge_call(
-            self.edge,
-            self.prompt(q),
-            temperature=self.settings.generation.temperature,
-            max_tokens=self.settings.generation.max_tokens,
-        )
+        try:
+            gen = self.edge_call(
+                self.edge,
+                self.prompt(q),
+                temperature=self.settings.generation.temperature,
+                max_tokens=self.settings.generation.max_tokens,
+            )
+        except ClientError as exc:
+            raise StrategyError(exc, [], {}) from exc
         return gen.text, [gen], {}
 
 
@@ -69,9 +113,16 @@ class CloudOnly(Strategy):
         self.cloud = cloud
 
     def answer(self, q: Question) -> tuple[str, list[Generation], dict[str, Any]]:
-        gen = self.cloud.generate(
-            self.prompt(q),
-            temperature=self.settings.generation.temperature,
-            max_tokens=self.settings.generation.max_tokens,
-        )
+        try:
+            gen = self.cloud.generate(
+                self.prompt(q),
+                temperature=self.settings.generation.temperature,
+                max_tokens=self.settings.generation.max_tokens,
+            )
+        except ClientError as exc:
+            raise StrategyError(exc, [], {}) from exc
         return gen.text, [gen], {}
+
+
+register("edge", lambda ctx: EdgeOnly(_need(ctx.edge, "edge", "edge"), ctx.settings, mock=ctx.mock))
+register("cloud", lambda ctx: CloudOnly(_need(ctx.cloud, "cloud", "cloud"), ctx.settings, mock=ctx.mock))

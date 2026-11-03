@@ -1,4 +1,6 @@
-"""`python -m eclm.run`: answer every test question with one strategy and write one CSV row each."""
+"""`python -m eclm.run`: answer the test questions with one strategy (or --all) and write one CSV row each.
+
+Runs are resumable: qids already in the CSV are skipped and new rows are appended."""
 
 from __future__ import annotations
 
@@ -6,26 +8,25 @@ import argparse
 import json
 import logging
 import sys
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, NoReturn
 
 from tqdm import tqdm
 
-from eclm.clients import ClientUnavailable, make_client
+from eclm.clients import BudgetedClient, BudgetExceeded, ClientUnavailable, ModelClient, make_client
 from eclm.config import ConfigError, Settings, load_settings
 from eclm.data import TEST_FILE, load_questions
 from eclm.grading import extract_answer, is_correct
 from eclm.metrics import system_info
-from eclm.results import ResultWriter, result_path
-from eclm.strategies import CloudOnly, EdgeOnly, Strategy
+from eclm.results import ResultWriter, done_qids, result_path
+from eclm.strategies import STRATEGIES, StrategyContext, StrategyError
 from eclm.types import Generation, Question, Result
 
 log = logging.getLogger("eclm.run")
 
 STRATEGY_NAMES = ("edge", "cloud", "hybrid", "random")
-NOT_YET = {"hybrid": "T009", "random": "T010"}
 
 
 class _Parser(argparse.ArgumentParser):
@@ -133,34 +134,129 @@ def write_meta(path: Path, *, run_id: str, started_at: str, args: argparse.Names
     tmp.replace(path)
 
 
-def _make_strategy(args: argparse.Namespace, settings: Settings) -> tuple[Strategy, str, str]:
-    """(strategy, edge_model for the row/file name, cloud_model). Calls check() before any question."""
-    if args.strategy == "cloud":
-        cloud = make_client("cloud", settings, mock=args.mock)
-        cloud.check()
-        return CloudOnly(cloud, settings, mock=args.mock), "", cloud.name
-    edge_model = args.edge_model or settings.edge.hybrid_model
-    edge = make_client("edge", settings, model=edge_model, mock=args.mock)
-    edge.check()
-    return EdgeOnly(edge, settings, mock=args.mock), edge.name, ""
+# Clients each strategy needs. Strategies not listed (hybrid, random) need both sides.
+CLIENT_SIDES: dict[str, tuple[str, ...]] = {"edge": ("edge",), "cloud": ("cloud",)}
+ALL_ORDER = ("edge", "cloud", "hybrid", "random")  # ARCHITECTURE §10
 
 
-def run_one(args: argparse.Namespace, settings: Settings, questions: list[Question]) -> int:
+@dataclass(frozen=True)
+class Combo:
+    """One (strategy, edge model) cell of the experiment; edge_model is None for cloud-only."""
+
+    strategy: str
+    edge_model: str | None
+
+
+class _Clients:
+    """Builds each client once per process. The cloud client is wrapped in ONE BudgetedClient (§7)."""
+
+    def __init__(self, settings: Settings, mock: bool) -> None:
+        self.settings = settings
+        self.mock = mock
+        self._edge: dict[str, ModelClient] = {}
+        self._cloud: BudgetedClient | None = None
+
+    def edge(self, model: str) -> ModelClient:
+        if model not in self._edge:
+            client = make_client("edge", self.settings, model=model, mock=self.mock)
+            client.check()
+            self._edge[model] = client
+        return self._edge[model]
+
+    def cloud(self) -> BudgetedClient:
+        if self._cloud is None:
+            client = make_client("cloud", self.settings, mock=self.mock)
+            client.check()
+            self._cloud = BudgetedClient(client, self.settings.cloud.max_calls_per_run)
+        return self._cloud
+
+
+def plan_combos(args: argparse.Namespace, settings: Settings) -> list[Combo]:
+    """Single run, or the --all matrix: edge x each model, cloud, then hybrid/random if registered."""
+    if not args.all:
+        if args.strategy == "cloud":
+            return [Combo("cloud", None)]
+        return [Combo(args.strategy, args.edge_model or settings.edge.hybrid_model)]
+    combos: list[Combo] = []
+    for name in ALL_ORDER:
+        if name not in STRATEGIES:
+            continue
+        if name == "edge":
+            combos += [Combo("edge", m) for m in settings.edge.models]
+        elif name == "cloud":
+            combos.append(Combo("cloud", None))
+        else:
+            combos.append(Combo(name, settings.edge.hybrid_model))
+    return combos
+
+
+def _context(combo: Combo, args: argparse.Namespace, settings: Settings, clients: _Clients) -> StrategyContext:
+    sides = CLIENT_SIDES.get(combo.strategy, ("edge", "cloud"))
+    edge = clients.edge(combo.edge_model) if "edge" in sides and combo.edge_model else None
+    cloud = clients.cloud() if "cloud" in sides else None
+    return StrategyContext(
+        settings=settings,
+        edge_model=combo.edge_model,
+        network=args.network,
+        mock=args.mock,
+        results_dir=Path(settings.results_dir),
+        ratio=args.ratio,
+        edge=edge,
+        cloud=cloud,
+    )
+
+
+def _read_run_id(meta_file: Path) -> str | None:
     try:
-        strategy, edge_model, cloud_model = _make_strategy(args, settings)
-    except ClientUnavailable as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        return 1
-    path = result_path(settings.results_dir, strategy.name, edge_model or None, args.network)
-    started_at = now_utc()
-    run_id = f"{started_at}_{strategy.name}"
-    write_meta(meta_path(path), run_id=run_id, started_at=started_at, args=args, settings=settings)
+        run_id = json.loads(meta_file.read_text(encoding="utf-8")).get("run_id")
+    except (OSError, ValueError, AttributeError):
+        return None
+    return run_id if isinstance(run_id, str) and run_id else None
+
+
+def run_combo(
+    combo: Combo,
+    ctx: StrategyContext,
+    args: argparse.Namespace,
+    settings: Settings,
+    questions: list[Question],
+) -> int:
+    """Answer every question of `questions` not yet in this combo's CSV. Returns 0, or 2 if the budget ran out."""
+    strategy = STRATEGIES[combo.strategy](ctx)
+    edge_model = ctx.edge.name if ctx.edge is not None else (combo.edge_model or "")
+    cloud_model = ctx.cloud.name if ctx.cloud is not None else ""
+    path = result_path(settings.results_dir, strategy.name, combo.edge_model, args.network)
+    done = done_qids(path)
+    todo = [q for q in questions if q.qid not in done]
+    meta = meta_path(path)
+    # A resumed run keeps its original metadata and run_id, so every row of the CSV matches its meta.json.
+    run_id = _read_run_id(meta) if done else None
+    if done and run_id is None:
+        log.warning("%s has rows but no readable %s; writing new metadata", path, meta.name)
+    if run_id is None:
+        started_at = now_utc()
+        run_id = f"{started_at}_{strategy.name}"
+        write_meta(meta, run_id=run_id, started_at=started_at, args=args, settings=settings)
+    if not todo:
+        log.info("run %s -> %s already complete (%d questions)", run_id, path, len(questions))
+        return 0
     strategy.prepare(questions)
-    log.info("run %s -> %s (%d questions)", run_id, path, len(questions))
-    with ResultWriter(path) as writer:
-        desc = f"{strategy.name} {edge_model or cloud_model} {args.network}"
-        for q in tqdm(questions, desc=desc, file=sys.stderr):
-            text, gens, extra = strategy.answer(q)
+    log.info("run %s -> %s (%d of %d questions to do)", run_id, path, len(todo), len(questions))
+    desc = f"{strategy.name} {edge_model or cloud_model} {args.network}"
+    with ResultWriter(path) as writer, tqdm(
+        total=len(questions), initial=len(questions) - len(todo), desc=desc, file=sys.stderr
+    ) as bar:
+        for q in todo:
+            error = ""
+            try:
+                text, gens, extra = strategy.answer(q)
+            except StrategyError as exc:
+                text, gens, extra = "", exc.generations, exc.extra
+                error = f"{type(exc.cause).__name__}: {exc.cause}"
+                log.warning("%s failed on %s: %s", desc, q.qid, error)
+            except BudgetExceeded as exc:
+                log.warning("%s: %s; stopping before %s. Rerun the same command to resume.", desc, exc, q.qid)
+                return 2
             writer.write(
                 build_result(
                     run_id=run_id,
@@ -172,23 +268,47 @@ def run_one(args: argparse.Namespace, settings: Settings, questions: list[Questi
                     text=text,
                     gens=gens,
                     extra=extra,
+                    error=error,
                 )
             )
+            bar.update(1)
+    log.info("run %s -> %s finished", run_id, path)
+    return 0
+
+
+def run_all(args: argparse.Namespace, settings: Settings, questions: list[Question]) -> int:
+    combos = plan_combos(args, settings)
+    clients = _Clients(settings, args.mock)
+    try:  # check every backend before the first question
+        contexts = [_context(c, args, settings, clients) for c in combos]
+    except ClientUnavailable as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    for combo, ctx in zip(combos, contexts, strict=True):
+        code = run_combo(combo, ctx, args, settings, questions)
+        if code != 0:
+            return code
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s", stream=sys.stderr)
     args = build_parser().parse_args(argv)
-    for flag, task in (("all", "T007"), ("limit", "T007"), ("ratio", "T010")):
-        if getattr(args, flag) not in (None, False):
-            print(f"error: --{flag} is not implemented yet ({task})", file=sys.stderr)
-            return 1
-    if args.strategy is None:
-        print("error: --strategy is required (or --all, from T007)", file=sys.stderr)
+    if args.ratio is not None:
+        print("error: --ratio is not implemented yet (T010)", file=sys.stderr)
         return 1
-    if args.strategy in NOT_YET:
-        print(f"error: --strategy {args.strategy} is not implemented yet ({NOT_YET[args.strategy]})", file=sys.stderr)
+    if args.all and (args.strategy is not None or args.edge_model is not None):
+        print("error: --all runs every configured model; don't combine it with --strategy or --edge-model",
+              file=sys.stderr)
+        return 1
+    if not args.all and args.strategy is None:
+        print("error: --strategy is required (or --all)", file=sys.stderr)
+        return 1
+    if args.strategy is not None and args.strategy not in STRATEGIES:
+        print(f"error: --strategy {args.strategy} is not implemented yet", file=sys.stderr)
+        return 1
+    if args.limit is not None and args.limit < 1:
+        print("error: --limit must be at least 1", file=sys.stderr)
         return 1
     overrides = {"results_dir": args.results_dir} if args.results_dir else None
     try:
@@ -200,7 +320,10 @@ def main(argv: list[str] | None = None) -> int:
     if not test_file.is_file():
         print(f"error: {test_file} not found; run python -m eclm.data first", file=sys.stderr)
         return 1
-    return run_one(args, settings, load_questions(test_file))
+    questions = load_questions(test_file)
+    if args.limit is not None:
+        questions = questions[: args.limit]
+    return run_all(args, settings, questions)
 
 
 if __name__ == "__main__":

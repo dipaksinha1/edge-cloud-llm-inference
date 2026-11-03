@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from typing import Literal
 
-from eclm.clients.base import ClientError, ClientUnavailable, ModelClient
+from eclm.clients.base import BudgetedClient, BudgetExceeded, ClientError, ClientUnavailable, ModelClient
 from eclm.clients.cloud import CloudClient
 from eclm.clients.mock import MockClient, mock_accuracy
 from eclm.clients.ollama import OllamaClient
 from eclm.config import Settings
 
 __all__ = [
+    "BudgetExceeded",
+    "BudgetedClient",
     "ClientError",
     "CloudClient",
     "ClientUnavailable",

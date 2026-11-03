@@ -116,8 +116,8 @@
         "T006"
       ],
       "size": "M",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "Resume (meta + run_id kept), StrategyError rows, --all/--limit, BudgetedClient (exit 2, shared per process). test_run_edge_mock.py --all assertion swapped for --strategy random (user-approved)."
     },
     {
       "id": "T008",
