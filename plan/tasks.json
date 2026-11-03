@@ -82,8 +82,8 @@
         "T004"
       ],
       "size": "S",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "MemorySampler + system_info in metrics.py; Strategy.edge_call wraps edge calls; run writes <csv stem>.meta.json at start. Real Ollama RSS/overhead (N5) to check on Mac (T013)."
     },
     {
       "id": "T006",

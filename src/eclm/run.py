@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, NoReturn
@@ -15,6 +17,7 @@ from eclm.clients import ClientUnavailable, make_client
 from eclm.config import ConfigError, Settings, load_settings
 from eclm.data import TEST_FILE, load_questions
 from eclm.grading import extract_answer, is_correct
+from eclm.metrics import system_info
 from eclm.results import ResultWriter, result_path
 from eclm.strategies import EdgeOnly, Strategy
 from eclm.types import Generation, Question, Result
@@ -110,6 +113,26 @@ def build_result(
     )
 
 
+def meta_path(result_file: Path) -> Path:
+    """results/edge__qwen2.5-3b__normal.csv -> results/edge__qwen2.5-3b__normal.meta.json"""
+    return result_file.with_suffix(".meta.json")
+
+
+def write_meta(path: Path, *, run_id: str, started_at: str, args: argparse.Namespace, settings: Settings) -> None:
+    """Run metadata (§7). The config holds only the API key's env var name, never its value."""
+    meta = {
+        "run_id": run_id,
+        "started_at": started_at,
+        "args": vars(args),
+        "config": asdict(settings),
+        "system_info": system_info(settings, ollama=not args.mock),
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(meta, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
+    tmp.replace(path)
+
+
 def _make_strategy(args: argparse.Namespace, settings: Settings) -> tuple[Strategy, str, str]:
     edge_model = args.edge_model or settings.edge.hybrid_model
     edge = make_client("edge", settings, model=edge_model, mock=args.mock)
@@ -124,7 +147,9 @@ def run_one(args: argparse.Namespace, settings: Settings, questions: list[Questi
         print(f"error: {exc}", file=sys.stderr)
         return 1
     path = result_path(settings.results_dir, strategy.name, edge_model or None, args.network)
-    run_id = f"{now_utc()}_{strategy.name}"
+    started_at = now_utc()
+    run_id = f"{started_at}_{strategy.name}"
+    write_meta(meta_path(path), run_id=run_id, started_at=started_at, args=args, settings=settings)
     strategy.prepare(questions)
     log.info("run %s -> %s (%d questions)", run_id, path, len(questions))
     with ResultWriter(path) as writer:

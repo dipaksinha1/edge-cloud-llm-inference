@@ -41,5 +41,6 @@ N_TEST=$(wc -l < data/test_questions.jsonl)
 check "smoke: test set not empty" test "$N_TEST" -gt 0
 F=results/edge__qwen2.5-3b__normal.csv
 check "smoke: $F rows" test -f "$F" -a "$(rows "$F" 2>/dev/null || echo 0)" -eq "$N_TEST"
+check "smoke: ${F%.csv}.meta.json" test -s "${F%.csv}.meta.json"
 
 echo "VERIFY: PASS"

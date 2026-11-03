@@ -1,7 +1,7 @@
 # Progress
 
 ## Project state
-- Phase: **M1 complete** (T001–T003), **M2 started** (T004 done). Next: T005 (memory sampler + run metadata). PR build → main for M1 is still pending.
+- Phase: **M1 complete** (T001–T003), **M2 in progress** (T004, T005 done). Next: T006 (Groq cloud client + cloud-only). PR build → main for M1 is still pending.
 - Spec: plan/SPEC.md (R1–R13, N1–N6). Architecture: plan/ARCHITECTURE.md. ADRs 0001–0006.
 - 13 tasks in 4 milestones: M1 mock pipeline (T001–T003) · M2 real backends (T004–T007) · M3 hybrid + random (T008–T010) · M4 analysis + run guide (T011–T013).
 - Workflow: one task per fresh Claude Code cloud session via /next-task, commits on `build`, pushed after each task. Milestones merged to `main` via PR reviewed by Dk.
@@ -48,3 +48,9 @@
 - Gotchas: run.py already called `check()` and caught ClientUnavailable, so AC5 only needed a test. This session ran T003 and T004 back to back because the user asked for it.
 - Verified: verify.sh PASS. AC1 covered by a streaming test (text, 30 tokens, 20 tok/s, ttft ≤ total). AC2 by a test with a controlled perf_counter and an empty first chunk (ttft 2.0, not 0.5). AC3 by tests comparing the exact messages. AC4 by HTTP 500 and ReadTimeout tests. AC5 by run.main with a patched factory (exit 1, only /api/tags requested, no rows). A real non-mock run here exits 1 with the "not running" message. Reviewer: PASS, no blocking issues.
 - Follow-ups: T009 must count stage-2 samples the same way (the first sample reuses settings.seed). Real Ollama timing still needs checking on the Mac (T013).
+
+## 2026-11-03 · T005 · Memory sampler and run metadata · DONE
+- Did: `metrics.py` with MemorySampler (one sample on enter, a daemon thread at `edge.memory_sample_hz`, one on exit) and system_info / ollama_version. `Strategy.sampler()` + `edge_call()` wrap every edge call and fill `peak_mem_gb`, using `pids=[os.getpid()]` in mock mode. run.py writes `results/<csv stem>.meta.json` (run_id, started_at, args, config, system_info) atomically before the first question. verify.sh checks that the meta file exists. 13 tests in tests/test_metrics.py.
+- Decisions: GB = 1024**3 bytes. system_info gained optional `ollama=` / `http=` keywords, so mock runs never request /api/version and tests use MockTransport. The version request ignores proxy env vars (localhost). On Linux, cpu comes from /proc/cpuinfo.
+- Verified: verify.sh PASS. AC1 covered by fake process_iter tests (summed peak, case-insensitive match, AccessDenied/NoSuchProcess skipped, a spike caught by the thread). AC2 by an EdgeOnly test, a build_result max/blank test and the mock-run CSV. AC3 by a meta test with GROQ_API_KEY set (value absent, exact keys). AC4 by 10 start/stop cycles at 10 Hz averaging < 50 ms. Reviewer: PASS, no blocking issues.
+- Follow-ups: T007 should decide whether a resumed run keeps the original meta (it is currently overwritten on every run). N5 overhead in process_iter mode still needs checking on the Mac (T013).
