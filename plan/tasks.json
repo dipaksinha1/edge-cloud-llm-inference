@@ -164,8 +164,8 @@
         "T009"
       ],
       "size": "S",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "RandomRouter resolves the ratio in prepare() (--ratio or the hybrid CSV); 2 --all expectations in test_run_resume.py updated with user approval."
     },
     {
       "id": "T011",

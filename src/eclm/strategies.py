@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import logging
 import os
+import random
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, replace
@@ -14,9 +16,11 @@ from eclm.config import Settings
 from eclm.grading import extract_answer, is_correct
 from eclm.metrics import MemorySampler
 from eclm.prompts import build_prompt
+from eclm.results import offload_ratio, result_path
 from eclm.router import Router, RouterModel, router_path
 from eclm.types import Generation, Question
 
+log = logging.getLogger("eclm.strategies")
 
 class StrategyError(Exception):
     """A ClientError inside answer(). Keeps the calls that did complete so the runner can record them (§7)."""
@@ -218,6 +222,85 @@ def _hybrid(ctx: StrategyContext) -> Hybrid:
     return Hybrid(edge, cloud, router, ctx.settings, mock=ctx.mock)
 
 
+class RandomRouter(Strategy):
+    """Random-router baseline (R6): a seeded random subset of k = round(ratio * n) questions goes to the cloud.
+
+    The cloud set depends only on the seed, the sorted qids and k, so a resumed run picks the same set.
+    With ratio=None, prepare() reads it from `ratio_source` (the hybrid CSV for the same model and network);
+    it is read in prepare(), not at construction, because `--all` builds every strategy before hybrid runs.
+    """
+
+    name = "random"
+
+    def __init__(
+        self,
+        edge: ModelClient,
+        cloud: ModelClient,
+        ratio: float | None,
+        seed: int,
+        settings: Settings,
+        mock: bool = False,
+        *,
+        ratio_source: Path | None = None,
+    ) -> None:
+        super().__init__(settings, mock)
+        if ratio is not None and not 0.0 <= ratio <= 1.0:
+            raise ValueError(f"ratio must be between 0 and 1, got {ratio}")
+        self.edge = edge
+        self.cloud = cloud
+        self.ratio = ratio
+        self.seed = seed
+        self.ratio_source = ratio_source
+        self.cloud_qids: frozenset[str] | None = None
+
+    def resolve_ratio(self) -> float:
+        if self.ratio is not None:
+            return self.ratio
+        source = self.ratio_source
+        ratio = offload_ratio(source) if source is not None else None
+        if ratio is None:
+            where = f"no hybrid results at {source}" if source is not None else "no hybrid results file"
+            raise StrategyUnavailable(
+                f"random needs an offload ratio: pass --ratio R, or run --strategy hybrid for the same "
+                f"edge model and network first ({where})"
+            )
+        return ratio
+
+    def prepare(self, questions: list[Question]) -> None:
+        ratio = self.resolve_ratio()
+        qids = sorted({q.qid for q in questions})
+        k = round(ratio * len(qids))
+        self.cloud_qids = frozenset(random.Random(self.seed).sample(qids, k))
+        log.info("random router: ratio %.4f -> %d of %d questions to the cloud (seed %d)",
+                 ratio, k, len(qids), self.seed)
+
+    def answer(self, q: Question) -> tuple[str, list[Generation], dict[str, Any]]:
+        if self.cloud_qids is None:
+            raise RuntimeError("RandomRouter.prepare() must be called before answer()")
+        to_cloud = q.qid in self.cloud_qids
+        extra: dict[str, Any] = {"router_stage": "random"} if to_cloud else {}
+        temperature = self.settings.generation.temperature
+        max_tokens = self.settings.generation.max_tokens
+        try:
+            if to_cloud:
+                gen = self.cloud.generate(self.prompt(q), temperature=temperature, max_tokens=max_tokens)
+            else:
+                gen = self.edge_call(self.edge, self.prompt(q), temperature=temperature, max_tokens=max_tokens)
+        except ClientError as exc:
+            raise StrategyError(exc, [], extra) from exc
+        return gen.text, [gen], extra
+
+
+def _random(ctx: StrategyContext) -> RandomRouter:
+    edge = _need(ctx.edge, "edge", "random")
+    cloud = _need(ctx.cloud, "cloud", "random")
+    source = None
+    if ctx.ratio is None:
+        source = result_path(ctx.results_dir, "hybrid", ctx.edge_model or edge.name, ctx.network)
+    return RandomRouter(edge, cloud, ctx.ratio, ctx.settings.seed, ctx.settings, mock=ctx.mock, ratio_source=source)
+
+
 register("edge", lambda ctx: EdgeOnly(_need(ctx.edge, "edge", "edge"), ctx.settings, mock=ctx.mock))
 register("cloud", lambda ctx: CloudOnly(_need(ctx.cloud, "cloud", "cloud"), ctx.settings, mock=ctx.mock))
 register("hybrid", _hybrid)
+register("random", _random)

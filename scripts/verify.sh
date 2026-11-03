@@ -40,11 +40,14 @@ step "smoke: router train --mock" "$PY" -m eclm.router train --edge-model qwen2.
 check "smoke: models/router_qwen2.5-3b.joblib" test -s models/router_qwen2.5-3b.joblib
 step "smoke: run --all normal" "$PY" -m eclm.run --all --network normal --mock
 step "smoke: run edge degraded" "$PY" -m eclm.run --strategy edge --edge-model qwen2.5:3b --network degraded --mock
+step "smoke: run random degraded" "$PY" -m eclm.run --strategy random --edge-model qwen2.5:3b --ratio 0.25 \
+  --network degraded --mock
 N_TEST=$(wc -l < data/test_questions.jsonl)
 check "smoke: test set not empty" test "$N_TEST" -gt 0
 for F in results/edge__qwen2.5-3b__normal.csv results/edge__qwen2.5-0.5b__normal.csv \
          results/edge__llama3.2-1b__normal.csv results/cloud__none__normal.csv \
-         results/hybrid__qwen2.5-3b__normal.csv results/edge__qwen2.5-3b__degraded.csv; do
+         results/hybrid__qwen2.5-3b__normal.csv results/random__qwen2.5-3b__normal.csv \
+         results/edge__qwen2.5-3b__degraded.csv results/random__qwen2.5-3b__degraded.csv; do
   check "smoke: $F rows" test -f "$F" -a "$(rows "$F" 2>/dev/null || echo 0)" -eq "$N_TEST"
   check "smoke: ${F%.csv}.meta.json" test -s "${F%.csv}.meta.json"
 done

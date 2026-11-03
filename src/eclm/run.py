@@ -233,6 +233,8 @@ def run_combo(
     path = result_path(settings.results_dir, strategy.name, combo.edge_model, args.network)
     done = done_qids(path)
     todo = [q for q in questions if q.qid not in done]
+    if todo:  # before any file is written: e.g. random without a ratio raises StrategyUnavailable here
+        strategy.prepare(questions)
     meta = meta_path(path)
     # A resumed run keeps its original metadata and run_id, so every row of the CSV matches its meta.json.
     run_id = _read_run_id(meta) if done else None
@@ -245,7 +247,6 @@ def run_combo(
     if not todo:
         log.info("run %s -> %s already complete (%d questions)", run_id, path, len(questions))
         return 0
-    strategy.prepare(questions)
     log.info("run %s -> %s (%d of %d questions to do)", run_id, path, len(todo), len(questions))
     desc = f"{strategy.name} {edge_model or cloud_model} {args.network}"
     with ResultWriter(path) as writer, tqdm(
@@ -291,7 +292,11 @@ def run_all(args: argparse.Namespace, settings: Settings, questions: list[Questi
         print(f"error: {exc}", file=sys.stderr)
         return 1
     for combo, strategy, ctx in zip(combos, strategies, contexts, strict=True):
-        code = run_combo(combo, strategy, ctx, args, settings, questions)
+        try:
+            code = run_combo(combo, strategy, ctx, args, settings, questions)
+        except StrategyUnavailable as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
         if code != 0:
             return code
     return 0
@@ -300,8 +305,8 @@ def run_all(args: argparse.Namespace, settings: Settings, questions: list[Questi
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s", stream=sys.stderr)
     args = build_parser().parse_args(argv)
-    if args.ratio is not None:
-        print("error: --ratio is not implemented yet (T010)", file=sys.stderr)
+    if args.ratio is not None and not 0.0 <= args.ratio <= 1.0:
+        print("error: --ratio must be between 0 and 1", file=sys.stderr)
         return 1
     if args.all and (args.strategy is not None or args.edge_model is not None):
         print("error: --all runs every configured model; don't combine it with --strategy or --edge-model",

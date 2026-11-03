@@ -32,6 +32,17 @@ def done_qids(path: Path) -> set[str]:
         return {row["qid"] for row in csv.DictReader(f) if row.get("qid")}
 
 
+def offload_ratio(path: Path) -> float | None:
+    """Rows with ran_on == "cloud" / rows (ARCHITECTURE §6); None if the file is missing or has no rows."""
+    if not Path(path).is_file():
+        return None
+    with open(path, newline="", encoding="utf-8") as f:
+        ran_on = [row.get("ran_on", "") for row in csv.DictReader(f)]
+    if not ran_on:
+        return None
+    return sum(r == "cloud" for r in ran_on) / len(ran_on)
+
+
 class ResultWriter:
     """Appends rows, writing the header if the file is new, and flushes after every row."""
 

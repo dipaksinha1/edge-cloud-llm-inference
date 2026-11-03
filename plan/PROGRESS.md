@@ -1,7 +1,7 @@
 # Progress
 
 ## Project state
-- Phase: **M1 complete** (T001–T003), **M2 complete** (T004–T007). M3 started: T008, T009 done. Next: T010 (random router). PRs build → main for M1/M2 are still pending.
+- Phase: **M1 complete** (T001–T003), **M2 complete** (T004–T007). **M3 complete** (T008–T010). Next: T011 (analysis summary table). PRs build → main for M1/M2 are still pending.
 - Spec: plan/SPEC.md (R1–R13, N1–N6). Architecture: plan/ARCHITECTURE.md. ADRs 0001–0006.
 - 13 tasks in 4 milestones: M1 mock pipeline (T001–T003) · M2 real backends (T004–T007) · M3 hybrid + random (T008–T010) · M4 analysis + run guide (T011–T013).
 - Workflow: one task per fresh Claude Code cloud session via /next-task, commits on `build`, pushed after each task. Milestones merged to `main` via PR reviewed by Dk.
@@ -82,3 +82,10 @@
 - Existing tests changed (user approved in-session): test_run_resume.py's `mockdata` fixture now trains the mock router, and the expected `--all` file set and degraded count (4 → 5) include hybrid. The brief should have listed them.
 - Verified: verify.sh PASS. AC1–AC4 by scripted-client tests with fixed timings (TTFT 1.2 edge-kept at sample 2, 6.5 escalated, total 10.0). AC5 by verify.sh plus a mock-run test asserting a stage-2 row (the smoke CSV has 10 edge, 1 stage-1, 1 stage-2). A manual CLI run with no router exits 1 with the hint. Reviewer: PASS, no blocking issues.
 - Follow-ups: a failed edge sample's time is left out of total_s and edge_calls (matches §7 "completed calls", but understates latency on a timeout). T010's random factory is now built before any combo runs, so it should read the hybrid ratio in `prepare()`, not in the factory. In /replan, record Router's `mock=` keyword and the answering-call reading in ARCH §5/§6.
+
+## 2026-11-03 · T010 · Random-router baseline · DONE
+- Did: `RandomRouter` + `random` factory in strategies.py (k = round(ratio·n), cloud set = `Random(seed).sample(sorted(qids), k)`, cloud rows get router_stage "random"). `results.offload_ratio()`. run.py: `--ratio` accepted (must be in [0, 1]). `prepare()` now runs before meta.json is written, and a StrategyUnavailable from run_combo exits 1. verify.sh adds the `--ratio 0.25 --network degraded` step and asserts both random CSVs. 14 tests in tests/test_random_router.py.
+- Decisions: the ratio is resolved in `prepare()`, not the factory, because `--all` builds every strategy before hybrid has run. With no `--ratio`, it reads `results/hybrid__<model>__<network>.csv` (an empty or missing file means no ratio → exit 1, and no files are written). Edge rows leave router_stage blank.
+- Existing tests changed (user approved in-session): in test_run_resume.py the `--all` file set now includes random, and the degraded count goes from 5 to 6. AC4 requires both. The brief should have listed them.
+- Verified: verify.sh PASS. AC1 is covered by an exact seeded-set test plus a CLI test (3 cloud rows, the same 3 on a fresh rerun and on a resume from 4 rows). AC2 by a handcrafted degraded hybrid CSV (1/3 → 4 of 12, a normal-network decoy ignored) and an `--all` test. AC3 by an exit-1 test that checks the message names `--ratio` and the file, with no CSV or meta left. AC4/5 by verify.sh. A manual CLI run agreed. Reviewer: PASS, no blocking issues.
+- Follow-ups: the resolved ratio isn't recorded in meta.json, and if the hybrid CSV changes between a run and its resume, k (and so the cloud set) changes. Worth logging it in meta (/replan).
