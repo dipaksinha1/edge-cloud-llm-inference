@@ -98,8 +98,8 @@
         "T005"
       ],
       "size": "M",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "CloudClient (Groq, openai SDK streaming, own 1-16 s back-off) + CloudOnly + --strategy cloud; user approved switching one line of test_unimplemented_options_exit_1 from cloud to hybrid. Real Groq to check on Mac (T013)."
     },
     {
       "id": "T007",

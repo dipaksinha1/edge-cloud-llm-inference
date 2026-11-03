@@ -19,13 +19,13 @@ from eclm.data import TEST_FILE, load_questions
 from eclm.grading import extract_answer, is_correct
 from eclm.metrics import system_info
 from eclm.results import ResultWriter, result_path
-from eclm.strategies import EdgeOnly, Strategy
+from eclm.strategies import CloudOnly, EdgeOnly, Strategy
 from eclm.types import Generation, Question, Result
 
 log = logging.getLogger("eclm.run")
 
 STRATEGY_NAMES = ("edge", "cloud", "hybrid", "random")
-NOT_YET = {"cloud": "T006", "hybrid": "T009", "random": "T010"}
+NOT_YET = {"hybrid": "T009", "random": "T010"}
 
 
 class _Parser(argparse.ArgumentParser):
@@ -134,6 +134,11 @@ def write_meta(path: Path, *, run_id: str, started_at: str, args: argparse.Names
 
 
 def _make_strategy(args: argparse.Namespace, settings: Settings) -> tuple[Strategy, str, str]:
+    """(strategy, edge_model for the row/file name, cloud_model). Calls check() before any question."""
+    if args.strategy == "cloud":
+        cloud = make_client("cloud", settings, mock=args.mock)
+        cloud.check()
+        return CloudOnly(cloud, settings, mock=args.mock), "", cloud.name
     edge_model = args.edge_model or settings.edge.hybrid_model
     edge = make_client("edge", settings, model=edge_model, mock=args.mock)
     edge.check()

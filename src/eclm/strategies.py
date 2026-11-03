@@ -59,3 +59,19 @@ class EdgeOnly(Strategy):
             max_tokens=self.settings.generation.max_tokens,
         )
         return gen.text, [gen], {}
+
+
+class CloudOnly(Strategy):
+    name = "cloud"
+
+    def __init__(self, cloud: ModelClient, settings: Settings, mock: bool = False) -> None:
+        super().__init__(settings, mock)
+        self.cloud = cloud
+
+    def answer(self, q: Question) -> tuple[str, list[Generation], dict[str, Any]]:
+        gen = self.cloud.generate(
+            self.prompt(q),
+            temperature=self.settings.generation.temperature,
+            max_tokens=self.settings.generation.max_tokens,
+        )
+        return gen.text, [gen], {}

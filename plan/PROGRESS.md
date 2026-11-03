@@ -1,7 +1,7 @@
 # Progress
 
 ## Project state
-- Phase: **M1 complete** (T001–T003), **M2 in progress** (T004, T005 done). Next: T006 (Groq cloud client + cloud-only). PR build → main for M1 is still pending.
+- Phase: **M1 complete** (T001–T003), **M2 in progress** (T004–T006 done). Next: T007 (resumable runner, error rows, --all, --limit, budget), which completes M2. PR build → main for M1 is still pending.
 - Spec: plan/SPEC.md (R1–R13, N1–N6). Architecture: plan/ARCHITECTURE.md. ADRs 0001–0006.
 - 13 tasks in 4 milestones: M1 mock pipeline (T001–T003) · M2 real backends (T004–T007) · M3 hybrid + random (T008–T010) · M4 analysis + run guide (T011–T013).
 - Workflow: one task per fresh Claude Code cloud session via /next-task, commits on `build`, pushed after each task. Milestones merged to `main` via PR reviewed by Dk.
@@ -54,3 +54,11 @@
 - Decisions: GB = 1024**3 bytes. system_info gained optional `ollama=` / `http=` keywords, so mock runs never request /api/version and tests use MockTransport. The version request ignores proxy env vars (localhost). On Linux, cpu comes from /proc/cpuinfo.
 - Verified: verify.sh PASS. AC1 covered by fake process_iter tests (summed peak, case-insensitive match, AccessDenied/NoSuchProcess skipped, a spike caught by the thread). AC2 by an EdgeOnly test, a build_result max/blank test and the mock-run CSV. AC3 by a meta test with GROQ_API_KEY set (value absent, exact keys). AC4 by 10 start/stop cycles at 10 Hz averaging < 50 ms. Reviewer: PASS, no blocking issues.
 - Follow-ups: T007 should decide whether a resumed run keeps the original meta (it is currently overwritten on every run). N5 overhead in process_iter mode still needs checking on the Mac (T013).
+
+## 2026-11-03 · T006 · Groq cloud client and cloud-only strategy · DONE
+- Did: `clients/cloud.py` CloudClient: `openai.OpenAI(max_retries=0)`, streams with `stream_options.include_usage` and sends a seed like the other clients. Its own back-off (1, 2, 4, 8, 16 s, injectable sleep) covers 429/5xx/connection errors; other 4xx fail at once. `check()`: missing key, 401 → "Groq rejected the API key", model not listed. CloudOnly strategy, `--strategy cloud`, `make_client("cloud")`. verify.sh smoke runs cloud and checks its rows and meta. 16 tests in tests/test_cloud.py.
+- Decisions: timing covers the successful attempt only (back-off sleeps are rate limiting, not latency). With no usage chunk, content chunks are counted as tokens. `check()` uses the back-off too.
+- Existing test changed (user approved in-session): test_run_edge_mock.py:73 now asserts `--strategy hybrid` exits 1 instead of cloud. The brief should have listed it, because AC4 makes cloud succeed.
+- Gotchas: installed openai (3.43) uses `httpx2` and types `http_client` as `httpx2.Client`, so the injected `httpx.Client` is passed with `cast(Any, ...)` and works by duck typing. A stale `.mypy_cache` can hide the type error (cold cache passed, warm failed).
+- Verified: verify.sh PASS (twice). AC1 covered by an SSE test with a controlled clock (40 tokens, tps = 40/(1.7-0.5), empty first chunk). AC2 by recorded sleeps [1,2] and six 429/503s → ClientError. AC3 by an exact-message test, run exit 1 with no CSV, and a sentinel key absent from stdout, stderr, logs, CSV and meta. AC4 by a mock run test plus smoke. Reviewer: PASS, no blocking issues.
+- Follow-ups: real Groq (model id, rate limits) still needs checking on the Mac (T013).
