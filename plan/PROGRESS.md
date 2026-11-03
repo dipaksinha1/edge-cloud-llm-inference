@@ -1,7 +1,7 @@
 # Progress
 
 ## Project state
-- Phase: **M1 complete** (T001–T003), **M2 complete** (T004–T007). Next: T008 (router features and training), starting M3. PRs build → main for M1/M2 are still pending.
+- Phase: **M1 complete** (T001–T003), **M2 complete** (T004–T007). M3 started: T008 done. Next: T009 (hybrid strategy). PRs build → main for M1/M2 are still pending.
 - Spec: plan/SPEC.md (R1–R13, N1–N6). Architecture: plan/ARCHITECTURE.md. ADRs 0001–0006.
 - 13 tasks in 4 milestones: M1 mock pipeline (T001–T003) · M2 real backends (T004–T007) · M3 hybrid + random (T008–T010) · M4 analysis + run guide (T011–T013).
 - Workflow: one task per fresh Claude Code cloud session via /next-task, commits on `build`, pushed after each task. Milestones merged to `main` via PR reviewed by Dk.
@@ -69,3 +69,9 @@
 - Existing test changed (user approved in-session): test_run_edge_mock.py:74 now asserts `--strategy random` exits 1 instead of `--all`, because AC4 makes `--all` succeed. The brief should have listed it.
 - Verified: verify.sh PASS. AC1 by a KeyboardInterrupt-after-3 test, then a rerun with exact qids. AC2 by a ClientError-on-one-qid test (edge and cloud) plus a completed-calls StrategyError test. AC3 by budget=3 → exit 2 with 3 rows, then a rerun, then completion; a manual CLI run agreed. AC4 by smoke and a file-set test. AC5 by a byte-compare of the normal files. Reviewer: PASS, and non-blocking items 2 and 3 were fixed.
 - Follow-ups: `prepare()` receives the full (limited) question list, not only the remaining ones, which T010 needs to know. Earlier PROGRESS entries have a duplicated T001/PLAN block inside T003 (left as is).
+
+## 2026-11-03 · T008 · Router features and training command · DONE
+- Did: `router.py` with FEATURES/`features()`, `SUBJECT_GROUPS` (all 57 MMLU subjects per hendrycks categories.py, unknown → other), `edge_labels`, `train_router`, `RouterModel` (joblib save/load, `predict_hard`), `router_path`, and the `python -m eclm.router train` CLI. verify.sh smoke trains the qwen2.5:3b router and checks the joblib file. 28 tests in tests/test_router.py.
+- Decisions: `train_router` takes an extra keyword-only `mock=False` so MockClient prompts carry the gold marker (ARCH §5 should be updated in a /replan). n_numbers, n_math_ops and max_number_digits use the question text only; n_words adds the MMLU choices. Op symbols are counted literally, so the '-' in "well-known" counts too. `RouterModel.train_accuracy` is reported but not saved. `load()` rejects a file trained on a different FEATURES list. "Share predicted hard" uses score > threshold (strict).
+- Verified: verify.sh PASS. AC1 by 3 hand-checked vectors plus group-count tests. AC2 by a scripted fake edge that is wrong on long questions. AC3 by a save/load test over 24 probes. AC4 by a CLI run with no test file, and a spy test with a poison test file that shows only calibration is opened. AC5 by verify.sh. The mock calibration has both classes for all 3 edge models (tested). Reviewer: PASS, no blocking issues.
+- Follow-ups: T009's Router.decide should use the same strict `>` against the threshold. Mock training accuracy for qwen2.5:3b is 0.75, with 25% of questions predicted hard.

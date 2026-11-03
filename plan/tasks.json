@@ -133,8 +133,8 @@
         "T007"
       ],
       "size": "M",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "router.py: features/SUBJECT_GROUPS/train_router/RouterModel + train CLI. train_router has an extra keyword-only mock=False (MockClient needs the gold marker); ARCH §5 signature should list it in a /replan. Router.decide left for T009."
     },
     {
       "id": "T009",
