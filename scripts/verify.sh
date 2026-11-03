@@ -33,6 +33,9 @@ rm -rf "$ROOT/.verify_tmp" && mkdir -p "$ROOT/.verify_tmp"
 cp "$ROOT/config.yaml" "$ROOT/.verify_tmp/"
 cd "$ROOT/.verify_tmp" || exit 1
 step "smoke: data --mock" "$PY" -m eclm.data --mock
+for D in data/test_questions.jsonl data/calibration_questions.jsonl; do
+  check "smoke: $D has 12 lines" test -f "$D" -a "$(wc -l < "$D" 2>/dev/null || echo 0)" -eq 12
+done
 step "smoke: run edge"    "$PY" -m eclm.run --strategy edge --edge-model qwen2.5:3b --network normal --mock
 N_TEST=$(wc -l < data/test_questions.jsonl)
 check "smoke: test set not empty" test "$N_TEST" -gt 0

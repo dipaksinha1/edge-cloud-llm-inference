@@ -50,8 +50,8 @@
         "T001"
       ],
       "size": "M",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "build_datasets + offline-by-default tests (autouse conftest loader guard); 24-question fixture; verify.sh asserts 12/12 data files. Real HF download unverified here (blocked), check on Mac (T013)."
     },
     {
       "id": "T004",

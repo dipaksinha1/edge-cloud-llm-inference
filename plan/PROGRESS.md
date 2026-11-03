@@ -1,7 +1,7 @@
 # Progress
 
 ## Project state
-- Phase: **M1 in progress.** T001, T002 done. Next: T003 (dataset builder), which completes M1 (then PR build → main).
+- Phase: **M1 complete** (T001–T003 done). Next: PR build → main for M1, then T004 (Ollama client).
 - Spec: plan/SPEC.md (R1–R13, N1–N6). Architecture: plan/ARCHITECTURE.md. ADRs 0001–0006.
 - 13 tasks in 4 milestones: M1 mock pipeline (T001–T003) · M2 real backends (T004–T007) · M3 hybrid + random (T008–T010) · M4 analysis + run guide (T011–T013).
 - Workflow: one task per fresh Claude Code cloud session via /next-task, commits on `build`, pushed after each task. Milestones merged to `main` via PR reviewed by Dk.
@@ -34,3 +34,10 @@
 - Tried & failed: round 1 (last marker wins, last capital wins) was confidently wrong on later prose and negations. Round 2 fixed those but over-applied the "=" rule. Both were caught by reviewer probes and kept as regression tests.
 - Verified: verify.sh PASS. AC1 17+ GSM8K cases, AC2 12+ MMLU cases, AC3/AC4 dedicated tests. Two review rounds; round-2 findings fixed and tested (the review limit was reached, so no third round).
 - Follow-ups: with no marker, a plain-hyphen range ("10-12") still reads as -12 (rare in GSM8K).
+
+## 2026-11-03 · T003 · Dataset builder with seeded, disjoint test and calibration sets · DONE
+- Did: `build_datasets` (GSM8K test/train, MMLU test/validation, plus dev only if validation is short), `DatasetError`, CLI without `--mock` now downloads. Fixture grew to 24 questions (all 4 MMLU groups, varied lengths and number counts). verify.sh asserts both data files have 12 lines. 22 tests in tests/test_data.py.
+- Decisions: question text is compared after collapsing whitespace and casefolding. Calibration skips test texts, and each pool drops repeated texts. Output order is GSM8K then MMLU, sorted by row. GSM8K gold reuses grading's `_to_decimal`/`_normalise`. An autouse conftest fixture makes `eclm.data._load_split` raise, so no test can download.
+- Gotchas: `test_run_edge_mock.py::test_unimplemented_options_exit_1` (`data.main([]) == 1`) now passes through the offline loader guard. It tests loader failure, not an unimplemented option, and should be renamed in a /replan.
+- Verified: verify.sh PASS. AC1 is covered by the counts/disjoint and text-overlap tests, AC2 by a CLI byte-compare with the same and a different seed, AC3 by a failing-loader test (exit 1, names cais/mmlu, old files untouched). A real run here was blocked by a Hugging Face 403 and exited 1 naming gsm8k. AC4 by a fixture test plus verify.sh, AC5 by a round-trip test. Reviewer: PASS, no blocking issues.
+- Follow-ups: the real download is unverified in a cloud session, so check it on the Mac (T013). The two files are renamed one after the other, so if the second write fails they can end up mismatched.
