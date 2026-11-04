@@ -113,7 +113,7 @@ and read the `ttft_mean`, `ttft_median` and `total_mean` columns in `smoke_resul
 
 ## 7. Memory sampler overhead (N5: under 5 %)
 
-This times the same 10 edge calls with and without the memory sampler. The order flips on every question (plain first, then sampled first), so Ollama's prompt cache and background noise favour neither side, and it also compares generation time only (`total_s - ttft_s`). It needs Ollama and the step-1 data, and takes a few minutes.
+This times the same 10 edge calls with and without the memory sampler (built with `memory_sampler`, the same function real runs use). The order flips on every question (plain first, then sampled first), so Ollama's prompt cache and background noise favour neither side, and it also compares generation time only (`total_s - ttft_s`). It needs Ollama and the step-1 data, and takes a few minutes.
 
 ```bash
 python - <<'EOF'
@@ -122,8 +122,8 @@ from pathlib import Path
 from eclm.clients import make_client
 from eclm.config import load_settings
 from eclm.data import load_questions
-from eclm.metrics import MemorySampler
 from eclm.prompts import build_prompt
+from eclm.strategies import memory_sampler
 
 s = load_settings()
 edge = make_client("edge", s, model="qwen2.5:3b")
@@ -148,9 +148,9 @@ for i, q in enumerate(qs):
     p = build_prompt(q)
     if i % 2 == 0:
         plain.append(timed(p, None))
-        sampled.append(timed(p, MemorySampler(hz=s.edge.memory_sample_hz)))
+        sampled.append(timed(p, memory_sampler(s, mock=False)))
     else:
-        sampled.append(timed(p, MemorySampler(hz=s.edge.memory_sample_hz)))
+        sampled.append(timed(p, memory_sampler(s, mock=False)))
         plain.append(timed(p, None))
 for k, what in enumerate(["total", "generation only"]):
     a = statistics.mean(t[k] for t in plain)
@@ -196,11 +196,10 @@ Expected: 12 lines (3 edge models + cloud, 3 questions each).
 
 ## 8. Check the figures with real model names
 
-```bash
-python -m eclm.analyze --results-dir smoke_results --figures-dir smoke_figures
-```
+The smoke runs above use only one edge model, so check the labels on the mock figures instead: the mock models carry the real names, so all three edge models are on the axes. Run the README quick test again (about a minute, it starts with `rm -rf mock_test`), then:
 
-- [ ] Open `smoke_figures/*.png`: the x-axis labels (model names) don't overlap or get cut off.
+- [ ] Open `mock_test/figures/*.png`: the x-axis labels (`qwen2.5:3b`, `qwen2.5:0.5b`, `llama3.2:1b`, cloud, hybrid, random) don't overlap or get cut off.
+- [ ] Delete the folder afterwards: `rm -rf mock_test`.
 
 ## 9. Clean up and record
 

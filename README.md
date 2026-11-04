@@ -98,6 +98,7 @@ All commands are run from the repository folder.
 macOS / Linux:
 
 ```bash
+rm -rf mock_test
 mkdir -p mock_test
 cp config.yaml mock_test/
 cd mock_test
@@ -109,7 +110,7 @@ python -m eclm.analyze
 cd ..
 ```
 
-On Windows (PowerShell) the first three lines are `mkdir mock_test`, `copy config.yaml mock_test\` and `cd mock_test`. The rest is the same.
+On Windows (PowerShell) the first four lines are `Remove-Item -Recurse -Force mock_test -ErrorAction SilentlyContinue`, `mkdir mock_test`, `copy config.yaml mock_test\` and `cd mock_test`. The rest is the same. The first line removes the results of an earlier try, so the output below is what you see every time.
 
 Expected output, step by step:
 
@@ -125,7 +126,7 @@ You now have `mock_test/results/*.csv`, `mock_test/results/summary.md` and `mock
 
 Before the full experiment, check that Ollama and Groq really work, with 5 questions each. Make sure Ollama is running and `.env` has your key.
 
-First build the real question sets and train the router (this needs both; training asks `qwen2.5:3b` all 300 calibration questions, so allow 20–60 minutes):
+First build the real question sets and train the router. Building the data needs internet (it downloads from Hugging Face). Training needs Ollama running: it asks `qwen2.5:3b` all 300 calibration questions, so allow 20–60 minutes. Neither step needs the Groq key.
 
 ```bash
 python -m eclm.data
@@ -295,7 +296,7 @@ git push
 | Model not pulled | `error: Model qwen2.5:3b not found. Run: ollama pull qwen2.5:3b` | Run the `ollama pull` command it shows. |
 | No Groq key | `error: Set GROQ_API_KEY in .env (get a key at console.groq.com/keys)` | Create `.env` as in [Setup](#setup) step 5, in the folder you run the commands from. |
 | Wrong Groq key (HTTP 401) | `error: Groq rejected the API key` | Copy the key again from console.groq.com/keys into `.env` (no quotes, no spaces). |
-| Rate limit (HTTP 429) | the run slows down: it waits 1, 2, 4, 8, 16 s and retries, 5 retries per call. If all fail, that question's row gets an `error` and the run goes on. | Usually nothing. If many rows have errors (see `error_rate` in `results/summary.md`), check your limits on console.groq.com, then delete that CSV and its `.meta.json` and rerun it later. |
+| Rate limit (HTTP 429) | the run slows down: it waits 1, 2, 4, 8, 16 s and retries, 5 retries per call. If all fail, that question's row gets an `error` and the run goes on. | Usually nothing. If many rows have errors (see `error_rate` in `results/summary.md`), check your limits on console.groq.com, then delete that CSV and its `.meta.json` and rerun it later. If it was a **hybrid** CSV, also delete and rerun the **random** CSV and `.meta.json` for the same model and network: random takes its share of cloud questions from hybrid, and a finished random file is never recalculated. |
 | Cloud model renamed | `error: Model llama-3.3-70b-versatile is not available on Groq. Check cloud.model in config.yaml.` | Check the model list on console.groq.com and update `cloud.model`. |
 | Run interrupted (Ctrl+C, crash, laptop asleep) | the CSV stops part-way | Run the **same command** again. It prints `(N of 200 questions to do)` and continues where it stopped. Use the same `--network` label. |
 | Cloud budget reached, exit code 2 | `WARNING ... cloud-call budget of 1500 calls for this run is used up; stopping before ... Rerun the same command to resume.` The command exits with code 2 (`echo $?` shows `2`). | The run stopped cleanly after `cloud.max_calls_per_run` (1500) cloud calls in this command. Run the same command again: it resumes with a fresh budget. |

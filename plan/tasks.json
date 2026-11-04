@@ -316,8 +316,8 @@
         "T018"
       ],
       "size": "S",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "README (hybrid redo -> also random, rm -rf mock_test + PowerShell line, data/router need no Groq key), checklist (N5 uses memory_sampler, step 8 checks labels on mock figures), doc-test extractor (redirects + fd digit, prefixed commands, heredocs skipped) with 3 new tests."
     }
   ]
 }

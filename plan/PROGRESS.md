@@ -1,7 +1,7 @@
 # Progress
 
 ## Project state
-- Phase: **M1 complete** (T001–T003), **M2 complete** (T004–T007). **M3 complete** (T008–T010). M4: T011–T015, T017 and T018 done, T019 todo, T016 blocked (waiting on Dk's Mac run). Next: T019, then Dk runs T016 (docs/MAC_CHECKLIST.md on the Mac), then the full experiment. PRs build → main for M1/M2 are still pending.
+- Phase: **M1 complete** (T001–T003), **M2 complete** (T004–T007). **M3 complete** (T008–T010). M4: T011–T015 and T017–T019 done, T016 blocked (waiting on Dk's Mac run). Next: Dk runs T016 (docs/MAC_CHECKLIST.md on the Mac), then the full experiment. PRs build → main for M1/M2 are still pending.
 - Spec: plan/SPEC.md (R1–R13, N1–N6). Architecture: plan/ARCHITECTURE.md. ADRs 0001–0006.
 - 19 tasks in 4 milestones: M1 mock pipeline (T001–T003) · M2 real backends (T004–T007) · M3 hybrid + random (T008–T010) · M4 analysis, run guide, Mac checks (T011–T019). T016 is a human task, kept `blocked` so cloud sessions skip it.
 - Workflow: one task per fresh Claude Code cloud session via /next-task, commits on `build`, pushed after each task. Milestones merged to `main` via PR reviewed by Dk.
@@ -151,3 +151,7 @@
 
 ## 2026-11-04 · REPLAN · Cold-audit fixes for T017–T019 · DONE
 - Did: applied the cold audit of the T017–T019 briefs. T017: random-only `strategy` key (an existing test pins the edge meta keys), AC2 interrupts by cutting rows (not `--limit`), smoke parses the JSON, ARCH §7 no longer claims the cloud set survives a changed question count. T019: shlex operator list and the fd-digit rule for `2>&1`, the PowerShell version of the new `rm -rf mock_test` line, an exact step-8 instruction (re-run the quick test and look at `mock_test/figures`), and a hint for detecting heredocs. T018's notes were already handled in its implementation (see its entry).
+
+## 2026-11-04 · T019 · Fix the open README, checklist and doc-test findings from the T013 code review · DONE
+- Did: README: the rate-limit row says that redoing a hybrid CSV means redoing random too. The Quick test starts with `rm -rf mock_test` (PowerShell: `Remove-Item -Recurse -Force mock_test -ErrorAction SilentlyContinue`). The Smoke test intro says data needs internet and router training needs Ollama, and neither needs the Groq key. Checklist: the N5 snippet builds its sampler with `strategies.memory_sampler(s, mock=False)`; step 8 checks the labels on the re-run mock figures (all three model names) instead of smoke_figures. tests/test_readme_commands.py: words stop at redirect/background operators and drop the fd digit of `2>&1`, `-m eclm[.x]` is found after any prefix (and `-m pip`, `git commit -m "eclm ..."`, `eclm_tools` are ignored), heredoc bodies are skipped. 3 new extractor tests; the existing ones are unchanged.
+- Verified: verify.sh PASS. AC1: docs read, and the doc test still parses every command (24). AC2: the redirect/pipe, prefix and heredoc tests (each failed before the extractor change). AC3: the step-7 snippet with mock clients and `memory_sampler(s, mock=True)` printed the 3 expected lines. AC4: the README quick-test block run twice with `env -i bash -e` (exit 0 both times, the same 11 key output lines, no "already complete"). AC5: verify.sh.
