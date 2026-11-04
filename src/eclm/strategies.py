@@ -114,6 +114,14 @@ class Strategy(ABC):
         """Optional hook called once before the run (RandomRouter overrides it)."""
         return None
 
+    def meta(self) -> dict[str, Any]:
+        """Extra run metadata, written to meta.json["strategy"] when a run starts (§7). Called after prepare()."""
+        return {}
+
+    def restore(self, recorded: dict[str, Any]) -> None:
+        """On a resume, called with meta.json["strategy"] before prepare() (RandomRouter overrides it)."""
+        return None
+
     @abstractmethod
     def answer(self, q: Question) -> tuple[str, list[Generation], dict[str, Any]]:
         """Return (final text, all generations in call order, extra row fields)."""
@@ -252,6 +260,9 @@ class RandomRouter(Strategy):
         self.seed = seed
         self.ratio_source = ratio_source
         self.cloud_qids: frozenset[str] | None = None
+        self.recorded_ratio: float | None = None  # from meta.json on a resume (T017)
+        self.recorded_questions: int | None = None
+        self._meta: dict[str, Any] = {}
 
     def resolve_ratio(self) -> float:
         if self.ratio is not None:
@@ -266,13 +277,48 @@ class RandomRouter(Strategy):
             )
         return ratio
 
+    def restore(self, recorded: dict[str, Any]) -> None:
+        """A resumed run keeps the ratio it started with, so its cloud set never changes mid-file (§7)."""
+        ratio = recorded.get("ratio")
+        if isinstance(ratio, (int, float)) and not isinstance(ratio, bool):
+            self.recorded_ratio = float(ratio)
+        n = recorded.get("questions")
+        if isinstance(n, int) and not isinstance(n, bool):
+            self.recorded_questions = n
+
+    def _source_name(self) -> str:
+        return "--ratio" if self.ratio is not None else str(self.ratio_source)
+
     def prepare(self, questions: list[Question]) -> None:
-        ratio = self.resolve_ratio()
+        if self.recorded_ratio is None:
+            ratio = self.resolve_ratio()
+        else:
+            ratio = self.recorded_ratio
+            try:
+                current: float | None = self.resolve_ratio()
+            except StrategyUnavailable:  # e.g. the hybrid CSV is gone: the recorded ratio is all we need
+                current = None
+            if current is not None and abs(current - ratio) > 1e-9:
+                log.warning(
+                    "random: keeping the recorded ratio %.4f from this run's meta.json; the current source (%s) "
+                    "gives %.4f. Delete the random CSV and its meta.json to start over with the new ratio.",
+                    ratio, self._source_name(), current,
+                )
         qids = sorted({q.qid for q in questions})
+        if self.recorded_questions is not None and self.recorded_questions != len(qids):
+            log.warning(
+                "random: this run started with %d questions and now has %d (a different --limit?), so the cloud "
+                "set differs from the first rows. Delete the random CSV and its meta.json to start over.",
+                self.recorded_questions, len(qids),
+            )
         k = round(ratio * len(qids))
         self.cloud_qids = frozenset(random.Random(self.seed).sample(qids, k))
+        self._meta = {"ratio": ratio, "ratio_source": self._source_name(), "cloud_questions": k, "questions": len(qids)}
         log.info("random router: ratio %.4f -> %d of %d questions to the cloud (seed %d)",
                  ratio, k, len(qids), self.seed)
+
+    def meta(self) -> dict[str, Any]:
+        return dict(self._meta)
 
     def answer(self, q: Question) -> tuple[str, list[Generation], dict[str, Any]]:
         if self.cloud_qids is None:

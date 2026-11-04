@@ -283,8 +283,8 @@
         "T013"
       ],
       "size": "S",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "Strategy.meta()/restore(); random writes meta.json['strategy'] {ratio, ratio_source, cloud_questions, questions} and a resume keeps the recorded ratio (warns if the source changed or the question count differs). Other strategies write no 'strategy' key (test_metrics asserts the exact key set)."
     },
     {
       "id": "T018",

@@ -119,15 +119,25 @@ def meta_path(result_file: Path) -> Path:
     return result_file.with_suffix(".meta.json")
 
 
-def write_meta(path: Path, *, run_id: str, started_at: str, args: argparse.Namespace, settings: Settings) -> None:
+def write_meta(
+    path: Path,
+    *,
+    run_id: str,
+    started_at: str,
+    args: argparse.Namespace,
+    settings: Settings,
+    strategy_meta: dict[str, Any] | None = None,
+) -> None:
     """Run metadata (§7). The config holds only the API key's env var name, never its value."""
-    meta = {
+    meta: dict[str, Any] = {
         "run_id": run_id,
         "started_at": started_at,
         "args": vars(args),
         "config": asdict(settings),
         "system_info": system_info(settings, ollama=not args.mock),
     }
+    if strategy_meta:  # only strategies with something to record (random); others keep the T005 key set
+        meta["strategy"] = strategy_meta
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")
     tmp.write_text(json.dumps(meta, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
@@ -206,12 +216,16 @@ def _context(combo: Combo, args: argparse.Namespace, settings: Settings, clients
     )
 
 
-def _read_run_id(meta_file: Path) -> str | None:
+def _read_meta(meta_file: Path) -> dict[str, Any] | None:
+    """The run's meta.json with a usable run_id, or None if it is missing or unreadable."""
     try:
-        run_id = json.loads(meta_file.read_text(encoding="utf-8")).get("run_id")
-    except (OSError, ValueError, AttributeError):
+        meta = json.loads(meta_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
         return None
-    return run_id if isinstance(run_id, str) and run_id else None
+    if not isinstance(meta, dict):
+        return None
+    run_id = meta.get("run_id")
+    return meta if isinstance(run_id, str) and run_id else None
 
 
 def warm_up(edge: ModelClient, settings: Settings, mock: bool) -> None:
@@ -245,17 +259,22 @@ def run_combo(
     path = result_path(settings.results_dir, strategy.name, combo.edge_model, args.network)
     done = done_qids(path)
     todo = [q for q in questions if q.qid not in done]
-    if todo:  # before any file is written: e.g. random without a ratio raises StrategyUnavailable here
-        strategy.prepare(questions)
     meta = meta_path(path)
     # A resumed run keeps its original metadata and run_id, so every row of the CSV matches its meta.json.
-    run_id = _read_run_id(meta) if done else None
+    recorded = _read_meta(meta) if done else None
+    if todo:  # before any file is written: e.g. random without a ratio raises StrategyUnavailable here
+        if recorded is not None:
+            strategy_meta = recorded.get("strategy")
+            strategy.restore(strategy_meta if isinstance(strategy_meta, dict) else {})
+        strategy.prepare(questions)
+    run_id: str | None = recorded["run_id"] if recorded is not None else None
     if done and run_id is None:
         log.warning("%s has rows but no readable %s; writing new metadata", path, meta.name)
     if run_id is None:
         started_at = now_utc()
         run_id = f"{started_at}_{strategy.name}"
-        write_meta(meta, run_id=run_id, started_at=started_at, args=args, settings=settings)
+        write_meta(meta, run_id=run_id, started_at=started_at, args=args, settings=settings,
+                   strategy_meta=strategy.meta())
     if not todo:
         log.info("run %s -> %s already complete (%d questions)", run_id, path, len(questions))
         return 0

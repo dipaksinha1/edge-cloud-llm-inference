@@ -62,6 +62,9 @@ for F in results/edge__qwen2.5-3b__normal.csv results/edge__qwen2.5-0.5b__normal
   check "smoke: ${F%.csv}.meta.json" test -s "${F%.csv}.meta.json"
 done
 
+# the random run records the ratio it used, so a resume keeps the same cloud set (T017)
+check "smoke: random meta records its ratio" grep -q '"ratio"' results/random__qwen2.5-3b__normal.meta.json
+
 N_CSV=$(find results -maxdepth 1 -name '*.csv' ! -name summary.csv | wc -l)
 step "smoke: analyze" "$PY" -m eclm.analyze
 check "smoke: results/summary.csv has $N_CSV rows" test -f results/summary.csv -a "$(rows results/summary.csv 2>/dev/null || echo 0)" -eq "$N_CSV"
