@@ -218,13 +218,14 @@ printf 'no dummynet quick on lo0 all\ndummynet out all pipe 1\ndummynet in all p
 sudo pfctl -E
 ```
 
-Expected: `pfctl -E` prints `pf enabled` and a line `Token : <number>` (warnings about `ALTQ` or flushing rules are normal). Write down the token. Check with `ping`.
+Expected: `pfctl -E` prints `pf enabled` and a line `Token : <number>` (warnings about `ALTQ` or flushing rules are normal). Write down the token number. Check with `ping`.
 
 Undo (restores Apple's default firewall rules, releases your hold on pf and removes the pipes; use the token you wrote down):
 
 ```bash
 sudo pfctl -f /etc/pf.conf
-sudo pfctl -X <token>
+TOKEN=1234567890        # replace with your token number
+sudo pfctl -X "$TOKEN"
 sudo dnctl -q flush
 ```
 

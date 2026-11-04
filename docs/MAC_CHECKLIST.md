@@ -99,9 +99,9 @@ python -m eclm.run --strategy edge --edge-model qwen2.5:3b --network degraded --
 Turn the degradation **off** again and check `ping` is back to normal. Then compare with the normal runs from steps 3 and 4:
 
 - [ ] Cloud `ttft_s` and `total_s` (in `smoke_results/cloud__none__degraded.csv`) are clearly higher than in `cloud__none__normal.csv` (at least about 0.2 s more on average).
-- [ ] Edge `ttft_s` (in `edge__qwen2.5-3b__degraded.csv`) is about the same as in `edge__qwen2.5-3b__normal.csv` (less than about 0.1 s apart on average). If it is 0.1 s or more higher, the shaping is also slowing `localhost`: use the `dnctl`/`pfctl` option, which skips `lo0`, and repeat this step.
+- [ ] Edge `ttft_median` for `edge qwen2.5:3b degraded` is about the same as for `normal` in `smoke_results/summary.md` (made by the `analyze` command below), less than about 0.1 s apart. Use the median, not the first row: the first edge row of a run can include loading the model. If it is 0.1 s or more higher, the shaping is also slowing `localhost`: use the `dnctl`/`pfctl` option, which skips `lo0`, and repeat this step.
 
-A quick way to compare averages (needs no extra installs):
+A quick way to compare averages and medians (needs no extra installs):
 
 ```bash
 python -m eclm.analyze --results-dir smoke_results --figures-dir smoke_figures

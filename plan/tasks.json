@@ -226,6 +226,19 @@
       "size": "S",
       "status": "proposed",
       "notes": "eclm.data/eclm.analyze use stock argparse, so a bad flag exits 2, which ARCH §5/§7 reserve for the cloud budget. Reuse run.py's _Parser (exit 1). Found in T013 review."
+    },
+    {
+      "id": "T015",
+      "title": "Warm up edge models before timed questions",
+      "milestone": "M4",
+      "brief": "",
+      "requirements": [],
+      "depends_on": [
+        "T013"
+      ],
+      "size": "S",
+      "status": "proposed",
+      "notes": "Nothing loads the Ollama model before the first timed call, so row 1 of each edge/hybrid run (and the first row after a model switch in --all) includes the model load time in ttft_s/total_s. Consider one untimed warm-up generate per edge model before the first question (needs an ARCH §6 rule, via /replan). Found in T013 review."
     }
   ]
 }
