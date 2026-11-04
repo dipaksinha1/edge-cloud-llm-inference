@@ -23,7 +23,11 @@ check() {  # check <name> <condition...>
 }
 
 rows() { echo $(( $(wc -l < "$1") - 1 )); }   # data rows in a CSV (minus header)
-exit_code() { "$@" >/dev/null 2>&1; echo $?; }   # exit status of a command, output discarded
+usage_error() {  # usage_error <command...>: exits 1 with argparse's "unrecognized arguments: --bogus" (not a crash)
+  local out rc
+  out="$("$@" 2>&1)"; rc=$?
+  [ "$rc" -eq 1 ] && grep -q "error: unrecognized arguments: --bogus" <<<"$out"
+}
 
 step ruff   "$PY" -m ruff check src tests
 step mypy   "$PY" -m mypy src
@@ -64,9 +68,9 @@ for FIG in fig1_accuracy fig2_latency fig3_tradeoff fig4_memory; do
 done
 check "smoke: figures/fig3_tradeoff.csv" test -s figures/fig3_tradeoff.csv
 # usage errors exit 1 in every CLI; 2 means only "cloud budget reached" (T014)
-for M in data "router train --edge-model qwen2.5:3b" run analyze; do
-  # shellcheck disable=SC2086  # $M is split on purpose into module + arguments
-  check "smoke: $M --bogus exits 1" test "$(exit_code "$PY" -m eclm.$M --bogus)" -eq 1
+for M in data "router train --edge-model qwen2.5:3b" "run --strategy edge --network normal" analyze; do
+  # shellcheck disable=SC2086  # $M is split on purpose into module + valid arguments
+  check "smoke: $M --bogus exits 1" usage_error "$PY" -m eclm.$M --bogus
 done
 
 echo "VERIFY: PASS"
