@@ -211,8 +211,21 @@
         "T012"
       ],
       "size": "S",
-      "status": "in_progress",
-      "notes": ""
+      "status": "done",
+      "notes": "README (setup, mock quick test, --limit 5 smoke into smoke_results/, full run, per-OS degradation + undo, outputs, troubleshooting) + docs/MAC_CHECKLIST.md (incl. N5 overhead and MMLU snippets); tests/test_readme_commands.py parses every eclm command in both docs."
+    },
+    {
+      "id": "T014",
+      "title": "data and analyze exit 1 on usage errors",
+      "milestone": "M4",
+      "brief": "",
+      "requirements": [],
+      "depends_on": [
+        "T013"
+      ],
+      "size": "S",
+      "status": "proposed",
+      "notes": "eclm.data/eclm.analyze use stock argparse, so a bad flag exits 2, which ARCH §5/§7 reserve for the cloud budget. Reuse run.py's _Parser (exit 1). Found in T013 review."
     }
   ]
 }

@@ -22,7 +22,7 @@ python -m eclm.data
 Expected: `wrote 200 test and 300 calibration questions to data`. Then:
 
 - [ ] `wc -l data/test_questions.jsonl data/calibration_questions.jsonl` shows 200 and 300.
-- [ ] Running `python -m eclm.data` again and then `git status data/` shows no change (same seed → byte-identical files).
+- [ ] Same seed → byte-identical files: run `shasum data/*.jsonl`, run `python -m eclm.data` again, run `shasum data/*.jsonl` again. Both checksum pairs are the same.
 
 ## 2. Router training on the real edge model
 
@@ -30,7 +30,7 @@ Expected: `wrote 200 test and 300 calibration questions to data`. Then:
 python -m eclm.router train --edge-model qwen2.5:3b
 ```
 
-Expected (takes 20–60 minutes): a progress bar over 300 calibration questions, then
+Expected (takes 20–60 minutes): **no output while it works** (there is no progress bar; only a `WARNING edge call failed ...` line if a call fails), then
 
 ```
 calibration questions: 300
@@ -57,7 +57,7 @@ Expected: `INFO run ... (5 of 5 questions to do)`, a progress bar to 5/5, then `
 - [ ] `tokens_per_s` plausible for Apple Silicon: roughly 20–100 for qwen2.5:3b (not 0, not thousands).
 - [ ] `ttft_s` is smaller than `total_s` on every row; `output_tokens` > 0.
 - [ ] `peak_mem_gb` is filled on every row and close to the `ollama ps` SIZE (within about 30 %). If it is far below (for example under 0.5 GB), the sampler isn't seeing the model's memory (on Apple Silicon the weights may sit in GPU/unified memory that process RSS doesn't count): record this as a limitation.
-- [ ] `predicted` looks like a number (GSM8K) or a letter A–D (MMLU), and `parse_failed` is `False` on most rows.
+- [ ] `predicted` looks like a number and `parse_failed` is `False` on most rows. (The test set lists GSM8K first, so `--limit 5` only covers GSM8K; MMLU is checked in step 7b.)
 - [ ] `smoke_results/edge__qwen2.5-3b__normal.meta.json` has `system_info` with your chip, RAM, macOS version and an Ollama version (not null).
 
 ## 4. Real cloud, 5 questions
@@ -99,7 +99,7 @@ python -m eclm.run --strategy edge --edge-model qwen2.5:3b --network degraded --
 Turn the degradation **off** again and check `ping` is back to normal. Then compare with the normal runs from steps 3 and 4:
 
 - [ ] Cloud `ttft_s` and `total_s` (in `smoke_results/cloud__none__degraded.csv`) are clearly higher than in `cloud__none__normal.csv` (at least about 0.2 s more on average).
-- [ ] Edge `total_s` (in `edge__qwen2.5-3b__degraded.csv`) is about the same as in `edge__qwen2.5-3b__normal.csv`. If it is much higher, the shaping is also slowing `localhost`: use the `dnctl`/`pfctl` option, which skips `lo0`.
+- [ ] Edge `ttft_s` (in `edge__qwen2.5-3b__degraded.csv`) is about the same as in `edge__qwen2.5-3b__normal.csv` (less than about 0.1 s apart on average). If it is 0.1 s or more higher, the shaping is also slowing `localhost`: use the `dnctl`/`pfctl` option, which skips `lo0`, and repeat this step.
 
 A quick way to compare averages (needs no extra installs):
 
@@ -111,7 +111,7 @@ and read the `ttft_mean` and `total_mean` columns in `smoke_results/summary.md`.
 
 ## 7. Memory sampler overhead (N5: under 5 %)
 
-This times the same 10 edge calls with and without the memory sampler, alternating so that warm-up and background noise affect both equally. It needs Ollama and the step-1 data, and takes a few minutes.
+This times the same 10 edge calls with and without the memory sampler. The order flips on every question (plain first, then sampled first), so Ollama's prompt cache and background noise favour neither side, and it also compares generation time only (`total_s - ttft_s`). It needs Ollama and the step-1 data, and takes a few minutes.
 
 ```bash
 python - <<'EOF'
@@ -130,22 +130,67 @@ qs = load_questions(Path(s.data_dir) / "test_questions.jsonl")[:10]
 gen = dict(temperature=s.generation.temperature, max_tokens=s.generation.max_tokens)
 edge.generate(build_prompt(qs[0]), **gen)  # warm-up: loads the model
 plain, sampled, peaks = [], [], []
-for q in qs:
+
+
+def timed(prompt, sampler):
+    if sampler is None:
+        g = edge.generate(prompt, **gen)
+    else:
+        with sampler:
+            g = edge.generate(prompt, **gen)
+        peaks.append(sampler.peak_gb or 0.0)
+    return g.total_s, g.total_s - g.ttft_s
+
+
+for i, q in enumerate(qs):
     p = build_prompt(q)
-    plain.append(edge.generate(p, **gen).total_s)
-    with MemorySampler(hz=s.edge.memory_sample_hz) as m:
-        sampled.append(edge.generate(p, **gen).total_s)
-    peaks.append(m.peak_gb or 0.0)
-a, b = statistics.mean(plain), statistics.mean(sampled)
-print(f"without sampler {a:.3f} s, with sampler {b:.3f} s, overhead {100 * (b - a) / a:+.1f} %")
+    if i % 2 == 0:
+        plain.append(timed(p, None))
+        sampled.append(timed(p, MemorySampler(hz=s.edge.memory_sample_hz)))
+    else:
+        sampled.append(timed(p, MemorySampler(hz=s.edge.memory_sample_hz)))
+        plain.append(timed(p, None))
+for k, what in enumerate(["total", "generation only"]):
+    a = statistics.mean(t[k] for t in plain)
+    b = statistics.mean(t[k] for t in sampled)
+    print(f"{what}: without sampler {a:.3f} s, with sampler {b:.3f} s, overhead {100 * (b - a) / a:+.1f} %")
 print(f"peak memory {max(peaks):.2f} GB at {s.edge.memory_sample_hz} Hz")
 EOF
 ```
 
-Expected: two lines, for example `without sampler 3.412 s, with sampler 3.430 s, overhead +0.5 %` and `peak memory 2.4 GB at 10 Hz`.
+Expected: three lines, for example `total: without sampler 3.412 s, with sampler 3.430 s, overhead +0.5 %`, a `generation only: ...` line, and `peak memory 2.4 GB at 10 Hz`.
 
-- [ ] Overhead is under +5 % (a small negative number is noise and also passes). If it is over 5 %, run it once more; if it stays over, try `memory_sample_hz: 5` in `config.yaml` (the minimum N5 allows) and record that.
+- [ ] Both overheads are under +5 % (a small negative number is noise and also passes). If it is over 5 %, run it once more; if it stays over, try `memory_sample_hz: 5` in `config.yaml` (the minimum N5 allows) and record that.
 - [ ] Peak memory is close to the `ollama ps` SIZE from step 3.
+
+## 7b. MMLU answers from the real models
+
+The 5-question smoke runs only cover GSM8K. This asks each edge model and the cloud model the first 3 MMLU test questions and prints the parsed letter:
+
+```bash
+python - <<'EOF'
+from pathlib import Path
+from eclm.clients import make_client
+from eclm.config import load_settings
+from eclm.data import load_questions
+from eclm.grading import extract_answer
+from eclm.prompts import build_prompt
+
+s = load_settings()
+qs = [q for q in load_questions(Path(s.data_dir) / "test_questions.jsonl") if q.dataset == "mmlu"][:3]
+gen = dict(temperature=s.generation.temperature, max_tokens=s.generation.max_tokens)
+for kind, model in [("edge", m) for m in s.edge.models] + [("cloud", None)]:
+    client = make_client(kind, s, model=model)
+    client.check()
+    for q in qs:
+        letter = extract_answer(client.generate(build_prompt(q), **gen).text, q.dataset, q.choices)
+        print(f"{client.name:28} {q.qid:14} predicted {letter} gold {q.gold}")
+EOF
+```
+
+Expected: 12 lines (3 edge models + cloud, 3 questions each).
+
+- [ ] `predicted` is a letter A–D on nearly every line, not `None`. Several `None` for one model means its answer format isn't parsed: record an example in the PROGRESS entry.
 
 ## 8. Check the figures with real model names
 

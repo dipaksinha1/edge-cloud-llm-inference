@@ -205,6 +205,8 @@ Two rules for every OS:
 2. Open it from System Settings. Click "Manage Profiles", add a profile called `eclm-degraded` with: downlink bandwidth 5 Mbps, downlink delay 100 ms, uplink bandwidth 5 Mbps, uplink delay 100 ms, packet loss 0 %. (100 ms each way = +200 ms RTT.)
 3. Pick `eclm-degraded` and switch it **ON**. Check with `ping`.
 
+Network Link Conditioner may also slow `localhost`, which would slow Ollama too. Step 6 of [docs/MAC_CHECKLIST.md](docs/MAC_CHECKLIST.md) checks for this; if it happens, use Option B.
+
 Undo: switch Network Link Conditioner **OFF**, and check that `ping` is back to normal.
 
 **Option B: `dnctl` + `pfctl` (Terminal).** This shapes every interface except loopback (`lo0`), so Ollama is not slowed down:
@@ -216,15 +218,17 @@ printf 'no dummynet quick on lo0 all\ndummynet out all pipe 1\ndummynet in all p
 sudo pfctl -E
 ```
 
-Expected: `pfctl` prints a few lines ending with `pf enabled` (warnings about `ALTQ` or flushing rules are normal). Check with `ping`.
+Expected: `pfctl -E` prints `pf enabled` and a line `Token : <number>` (warnings about `ALTQ` or flushing rules are normal). Write down the token. Check with `ping`.
 
-Undo (restores Apple's default firewall rules and removes the pipes):
+Undo (restores Apple's default firewall rules, releases your hold on pf and removes the pipes; use the token you wrote down):
 
 ```bash
 sudo pfctl -f /etc/pf.conf
-sudo pfctl -d
+sudo pfctl -X <token>
 sudo dnctl -q flush
 ```
+
+If you lost the token, `sudo pfctl -d` switches pf off completely instead (fine unless you use another firewall tool that needs pf).
 
 ### Linux
 
@@ -266,7 +270,7 @@ Undo: click **Stop** and close clumsy. Check that `ping` is back to normal.
 
 | Path | What | Committed? |
 |---|---|---|
-| `data/test_questions.jsonl`, `data/calibration_questions.jsonl` | the fixed question sets | yes |
+| `data/test_questions.jsonl`, `data/calibration_questions.jsonl` | the fixed question sets | yes (`git add data`) |
 | `models/router_qwen2.5-3b.joblib` | the trained router | no |
 | `results/<strategy>__<edge model>__<network>.csv` | one row per question, e.g. `results/edge__qwen2.5-3b__normal.csv`, `results/cloud__none__normal.csv` | with `git add -f` |
 | `results/<same name>.meta.json` | machine info and settings for that run | with `git add -f` |
@@ -276,6 +280,7 @@ Undo: click **Stop** and close clumsy. Check that `ping` is back to normal.
 Model names in file names have `:` replaced by `-` so they work on Windows. `results/` and `figures/` are git-ignored so test runs don't get committed by accident. Commit the final ones on purpose:
 
 ```bash
+git add data
 git add -f results figures
 git commit -m "Add experiment results"
 git push
@@ -298,7 +303,7 @@ git push
 | `test_questions.jsonl not found` | `error: data/test_questions.jsonl not found; run python -m eclm.data first` | Run `python -m eclm.data` from the repository folder. |
 | `config file not found` | `error: config file not found: config.yaml` | Run the commands from the repository folder (where `config.yaml` is). |
 
-Exit codes: `0` = done, `1` = a problem to fix first (message above), `2` = cloud budget reached (rerun to resume).
+Exit codes of `python -m eclm.run`: `0` = done, `1` = a problem to fix first (message above), `2` = cloud budget reached (rerun to resume). (A mistyped option to `eclm.data` or `eclm.analyze` also exits with `2`; that is just the option error, not the budget.)
 
 ## For developers
 

@@ -1,7 +1,7 @@
 # Progress
 
 ## Project state
-- Phase: **M1 complete** (T001–T003), **M2 complete** (T004–T007). **M3 complete** (T008–T010). M4: T011, T012 done. Next: T013 (README run guide + Mac checklist). PRs build → main for M1/M2 are still pending.
+- Phase: **M1 complete** (T001–T003), **M2 complete** (T004–T007). **M3 complete** (T008–T010). **M4 complete** (T011–T013). All 13 planned tasks done (T014 proposed). Next: Dk runs docs/MAC_CHECKLIST.md on the Mac, then the full experiment. PRs build → main for M1/M2 are still pending.
 - Spec: plan/SPEC.md (R1–R13, N1–N6). Architecture: plan/ARCHITECTURE.md. ADRs 0001–0006.
 - 13 tasks in 4 milestones: M1 mock pipeline (T001–T003) · M2 real backends (T004–T007) · M3 hybrid + random (T008–T010) · M4 analysis + run guide (T011–T013).
 - Workflow: one task per fresh Claude Code cloud session via /next-task, commits on `build`, pushed after each task. Milestones merged to `main` via PR reviewed by Dk.
@@ -103,3 +103,10 @@
 - Gotchas: mypy rejected `plt.rc_context(dict[str, Any])` (Literal-key stubs) only on a cold cache, so it's passed via `cast(Any, ...)`. This session also ran T010 and T011 (the user invoked /next-task three times).
 - Verified: verify.sh PASS. AC1 by smoke `test -s` on the 8 files plus a pipeline test checking PNG/PDF magic bytes, and a 300 dpi pixel-size test. AC2 by a normal-only, no-random test and a degraded-cloud-only test (files written, warnings asserted). AC3 by reading the side-file back and comparing it with summary offload_ratio/accuracy. All 4 PNGs were looked at. Reviewer: PASS, and non-blocking item 1 (fig3 legend placement) was fixed.
 - Follow-ups: figure styling constants are in code (ARCH §4 has no figure keys). Re-check the label fit with the real model set on the Mac (T013).
+
+## 2026-11-04 · T013 · README run guide and Mac real-backend checklist · DONE
+- Did: README.md rewritten in the brief's sections, with expected output after each step. docs/MAC_CHECKLIST.md: 10 numbered sections (data reproducibility, router training, real edge/cloud/hybrid `--limit 5`, degraded latency, N5 sampler overhead snippet, MMLU parsing snippet, figure labels, recording). tests/test_readme_commands.py extracts every `python -m eclm…` command from fenced blocks in both docs and calls `build_parser().parse_args` (no execution). .gitignore: mock_test/, smoke_results/, smoke_figures/.
+- Decisions: the mock quick test runs in a scratch `mock_test/` folder so it can't overwrite real data/results. Real smoke runs use `--results-dir smoke_results`, because a run resumes whatever is already in its file. Degradation = 100 ms each way + 5 Mbit/s both directions on every OS, never on loopback (Ollama is on localhost): pf `no dummynet quick on lo0`, Linux netem on egress + ifb for ingress, clumsy `not loopback`, 610 KB/s.
+- Gotchas: `router train` prints nothing for 20–60 min (no progress bar). `--limit 5` only covers GSM8K (test set is GSM8K first). `data/` was never committed, so README now says `git add data`. `eclm.data`/`eclm.analyze` use stock argparse, so bad flags exit 2 (clashes with the budget code; noted in README).
+- Verified: AC1 by extracting the README mock block and running it with `env -i bash -e` (exit 0, 16 result files, 9 figure files). AC2 by the new test (24 commands; a deliberately broken flag made it fail). AC3 read; reviewer checked pf/tc/clumsy syntax. AC4 verify.sh PASS. Both checklist Python snippets ran with mock clients substituted. Reviewer round 1: FAIL (no progress bar in router training; N5 timing order bias). Both fixed, plus 4 non-blocking items.
+- Follow-ups: proposed T014 (`eclm.data`/`eclm.analyze` exit 1 on usage errors, like run/router). Network Link Conditioner may shape localhost; the checklist's step 6 detects it.
