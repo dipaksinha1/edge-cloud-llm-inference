@@ -282,7 +282,12 @@ class RandomRouter(Strategy):
     def restore(self, recorded: dict[str, Any]) -> None:
         """A resumed run keeps the ratio it started with, so its cloud set never changes mid-file (§7)."""
         ratio = recorded.get("ratio")
-        if isinstance(ratio, (int, float)) and not isinstance(ratio, bool):
+        if ratio is not None:
+            if isinstance(ratio, bool) or not isinstance(ratio, (int, float)) or not 0.0 <= ratio <= 1.0:
+                raise StrategyUnavailable(  # also catches NaN: every comparison with NaN is False
+                    f"the random run's meta.json records an invalid ratio {ratio!r}; delete the random CSV and "
+                    "its meta.json to start over"
+                )
             self.recorded_ratio = float(ratio)
         n = recorded.get("questions")
         if isinstance(n, int) and not isinstance(n, bool):
@@ -302,8 +307,8 @@ class RandomRouter(Strategy):
                 current = None
             if current is not None and abs(current - ratio) > 1e-9:
                 log.warning(
-                    "random: keeping the recorded ratio %.4f from this run's meta.json; the current source (%s) "
-                    "gives %.4f. Delete the random CSV and its meta.json to start over with the new ratio.",
+                    "random: keeping the recorded ratio %.6g from this run's meta.json; the current source (%s) "
+                    "gives %.6g. Delete the random CSV and its meta.json to start over with the new ratio.",
                     ratio, self._source_name(), current,
                 )
         qids = sorted({q.qid for q in questions})

@@ -63,7 +63,10 @@ for F in results/edge__qwen2.5-3b__normal.csv results/edge__qwen2.5-0.5b__normal
 done
 
 # the random run records the ratio it used, so a resume keeps the same cloud set (T017)
-check "smoke: random meta records its ratio" grep -q '"ratio"' results/random__qwen2.5-3b__normal.meta.json
+# (parse the JSON: args.ratio is in every meta.json too, as null)
+check "smoke: random meta records its ratio" "$PY" -c \
+  'import json, sys; r = json.load(open(sys.argv[1]))["strategy"]["ratio"]; sys.exit(not isinstance(r, float))' \
+  results/random__qwen2.5-3b__normal.meta.json
 
 N_CSV=$(find results -maxdepth 1 -name '*.csv' ! -name summary.csv | wc -l)
 step "smoke: analyze" "$PY" -m eclm.analyze

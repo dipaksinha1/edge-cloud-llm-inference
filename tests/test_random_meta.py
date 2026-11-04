@@ -107,7 +107,7 @@ def test_resume_keeps_recorded_ratio_and_warns(mockdata: Path, caplog: pytest.Lo
     assert _cloud_rows(mockdata) == _expected_cloud(qids, r0)
     assert _cloud_rows(mockdata) != _expected_cloud(qids, 9 / len(qids))
     warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
-    assert any("keeping the recorded ratio 0.2500" in w and "gives 0.7500" in w for w in warnings), warnings
+    assert any("keeping the recorded ratio 0.25 " in w and "gives 0.75." in w for w in warnings), warnings
     assert _meta(mockdata)["strategy"]["ratio"] == r0  # the meta file is kept, not rewritten
 
 
@@ -171,3 +171,18 @@ def test_other_strategies_write_no_strategy_meta(mockdata: Path) -> None:
     random_meta = _meta(mockdata)["strategy"]
     assert random_meta["ratio_source"] == str(Path("results") / HYBRID)
     assert random_meta["questions"] == 2
+
+
+@pytest.mark.parametrize("bad", [1.5, -0.1, "0.25", float("nan")])
+def test_resume_with_invalid_recorded_ratio_exits_1(
+    mockdata: Path, capsys: pytest.CaptureFixture[str], bad: object
+) -> None:
+    assert run.main([*RANDOM, "--ratio", "0.25"]) == 0
+    _interrupt_after(mockdata, 4)
+    meta_file = mockdata / "results" / META
+    meta = json.loads(meta_file.read_text())
+    meta["strategy"]["ratio"] = bad
+    meta_file.write_text(json.dumps(meta))
+    assert run.main([*RANDOM, "--ratio", "0.25"]) == 1
+    assert "invalid ratio" in capsys.readouterr().err
+    assert len((mockdata / "results" / CSV).read_text().splitlines()) == 1 + 4  # nothing appended
