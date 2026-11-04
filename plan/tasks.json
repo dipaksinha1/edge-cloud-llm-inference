@@ -239,7 +239,7 @@
         "R7"
       ],
       "depends_on": [
-        "T014"
+        "T013"
       ],
       "size": "S",
       "status": "todo",
@@ -263,8 +263,34 @@
         "T015"
       ],
       "size": "M",
-      "status": "todo",
-      "notes": "Human task: Dk runs docs/MAC_CHECKLIST.md on the Mac. A cloud /next-task session must not attempt it; report RESULT: NEEDS_HUMAN."
+      "status": "blocked",
+      "notes": "Waiting on Dk's Mac run (human task, after T014/T015). Cloud sessions: don't pick it or change its status. Dk sets it done with the PROGRESS entry."
+    },
+    {
+      "id": "T017",
+      "title": "Record the resolved random ratio in meta.json",
+      "milestone": "M4",
+      "brief": "",
+      "requirements": [],
+      "depends_on": [
+        "T013"
+      ],
+      "size": "S",
+      "status": "proposed",
+      "notes": "From T010: the ratio RandomRouter resolves (from --ratio or the hybrid CSV) isn't saved, and if the hybrid CSV changes between a run and its resume, k and the cloud set change. Log the ratio and its source in <csv>.meta.json and warn on resume if it differs."
+    },
+    {
+      "id": "T018",
+      "title": "Count a failed stage-2 edge sample's time in total_s",
+      "milestone": "M4",
+      "brief": "",
+      "requirements": [],
+      "depends_on": [
+        "T013"
+      ],
+      "size": "S",
+      "status": "proposed",
+      "notes": "From T009: a stage-2 sample that raises ClientError (e.g. a timeout) is left out of total_s and edge_calls (ARCH §7 'completed calls'), which understates hybrid latency on timeouts. Decide in /replan whether to count its elapsed time."
     }
   ]
 }

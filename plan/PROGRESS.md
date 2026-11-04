@@ -1,9 +1,9 @@
 # Progress
 
 ## Project state
-- Phase: **M1 complete** (T001–T003), **M2 complete** (T004–T007). **M3 complete** (T008–T010). M4: T011–T013 done, T014–T016 todo. Next: T014 (CLI exit codes), then T015 (edge warm-up), then T016 (Dk runs docs/MAC_CHECKLIST.md on the Mac), then the full experiment. PRs build → main for M1/M2 are still pending.
+- Phase: **M1 complete** (T001–T003), **M2 complete** (T004–T007). **M3 complete** (T008–T010). M4: T011–T013 done, T014–T015 todo, T016 blocked (waiting on Dk's Mac run), T017–T018 proposed. Next: T014 (CLI exit codes), then T015 (edge warm-up), then Dk runs T016 (docs/MAC_CHECKLIST.md on the Mac), then the full experiment. PRs build → main for M1/M2 are still pending.
 - Spec: plan/SPEC.md (R1–R13, N1–N6). Architecture: plan/ARCHITECTURE.md. ADRs 0001–0006.
-- 16 tasks in 4 milestones: M1 mock pipeline (T001–T003) · M2 real backends (T004–T007) · M3 hybrid + random (T008–T010) · M4 analysis, run guide, Mac checks (T011–T016). T016 is a human task: cloud sessions report NEEDS_HUMAN on it.
+- 18 tasks in 4 milestones: M1 mock pipeline (T001–T003) · M2 real backends (T004–T007) · M3 hybrid + random (T008–T010) · M4 analysis, run guide, Mac checks (T011–T018). T016 is a human task, kept `blocked` so cloud sessions skip it.
 - Workflow: one task per fresh Claude Code cloud session via /next-task, commits on `build`, pushed after each task. Milestones merged to `main` via PR reviewed by Dk.
 - Real Ollama/Groq can't be reached from cloud sessions. They're tested via fake transports and verified on Dk's Mac with docs/MAC_CHECKLIST.md (written in T013, run in T016).
 - Deadlines: cloud credit expires 2026-11-05 02:59 EST · final presentation 2026-12-02/09 · report due 2026-12-10.
@@ -115,4 +115,5 @@
 - Did: Dk approved the proposed T014 and T015. Wrote their briefs and promoted them to todo. Added T016 (Dk runs docs/MAC_CHECKLIST.md on the Mac, after T014/T015, so the checklist runs on the final timing code).
 - Decisions (Dk): T015 warms up edge models only (one untimed call per run, before question 1, with the prompt template on a fixed dummy question). Cloud row 1's connection setup is accepted. T014 adds a shared `eclm.cli.ArgumentParser` that replaces the two private `_Parser` copies.
 - Architecture: §3 adds cli.py. §4 adds `edge.warmup_max_tokens: 1` (0 = off). §5 records the existing `mock=` keyword on train_router and Router, `analyze --config`, and the exit-1 usage errors. §6 adds the warm-up rule and says "answering call" (as built in T009). These were drift items from the T008/T009/T011 PROGRESS entries.
-- Not changed: SPEC and ADRs. Still open: the T010 follow-up (record the resolved random ratio in meta.json) and Q1 (router threshold).
+- Not changed: SPEC and ADRs. Q1 (router threshold) is still open.
+- Cold audit (finished after the first replan commit), fixes in a second commit: T016 is `blocked` ("waiting on Dk") so /next-task never picks it and can't leave it stuck in_progress. T015 no longer depends on T014, `<= 0` turns the warm-up off (no new validation), warm-up placement before tqdm, how to test "not sampled", a numeric row-1 check, and verify.sh smoke checks for T014 and T015. ARCH §3/§5 list cli.ArgumentParser, WARMUP_QUESTION and warm_up. The checklist's step 9 now matches T016 (heading, fields, `git add data`). The T009 and T010 follow-ups are now proposed T017 and T018.

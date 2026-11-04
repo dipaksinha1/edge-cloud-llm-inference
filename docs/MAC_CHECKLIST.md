@@ -202,9 +202,9 @@ python -m eclm.analyze --results-dir smoke_results --figures-dir smoke_figures
 
 ## 9. Clean up and record
 
-- [ ] Delete the smoke outputs: `rm -rf smoke_results smoke_figures`. Keep `data/` and `models/`.
+- [ ] Delete the smoke outputs: `rm -rf smoke_results smoke_figures`. Keep `data/` and `models/`, and commit the question sets: `git add data`.
 - [ ] Network degradation is OFF.
-- [ ] Record the findings: add an entry to `plan/PROGRESS.md` with the heading `## YYYY-MM-DD · MAC · Real-backend checklist · DONE` (or `BLOCKED`), listing the Mac model, macOS, Ollama version, tokens/s, peak_mem_gb vs `ollama ps`, cloud latency normal vs degraded, the N5 overhead, router accuracy and share predicted hard, and every box that didn't match. Commit and push it on `build`.
+- [ ] Record the findings: add an entry to `plan/PROGRESS.md` with the heading `## YYYY-MM-DD · T016 · Run the Mac real-backend checklist · DONE` (or `BLOCKED`), listing the Mac model and chip, RAM, macOS, Ollama version, edge tokens/s, peak_mem_gb vs `ollama ps` SIZE, cloud TTFT normal vs degraded, the N5 overhead (total and generation only), router accuracy and share predicted hard, the step-7b MMLU result, and every box that didn't match. In `plan/tasks.json` set T016 to `done` (or keep it `blocked` with the problem in its notes). Commit and push on `build`.
 - [ ] Anything that needs a code change goes into `plan/tasks.json` as a new task with status `proposed`.
 
 When every box is ticked, run the full experiment (README, "Full experiment").

@@ -58,7 +58,7 @@ src/eclm/
   run.py             run CLI (R2–R10)
   analyze.py         analysis CLI (R11)
   fixtures/mock_questions.jsonl   bundled questions for --mock (R12): 8 in T001 (4 GSM8K + 4 MMLU), expanded to 24 (12 + 12) in T003
-  results.py / run.py / router.py / data.py / analyze.py each expose build_parser() -> argparse.ArgumentParser
+  run.py / router.py / data.py / analyze.py each expose build_parser() -> argparse.ArgumentParser (an eclm.cli.ArgumentParser from T014)
 data/  models/  results/  figures/   (generated; only data/ is committed)
 docs/MAC_CHECKLIST.md               (T013)
 tests/  test_*.py (+ tests/conftest.py)
@@ -82,7 +82,7 @@ edge:
   hybrid_model: qwen2.5:3b
   timeout_s: 300
   memory_sample_hz: 10
-  warmup_max_tokens: 1        # one untimed edge call before a run's first question; 0 = off (T015)
+  warmup_max_tokens: 1        # ADDED BY T015 (not in config.yaml before it): one unrecorded edge call before a run's first question; <= 0 = off
 cloud:
   base_url: https://api.groq.com/openai/v1
   model: llama-3.3-70b-versatile
@@ -172,6 +172,7 @@ def mock_accuracy(name: str, ran_on: str) -> float
 
 # prompts.py
 def build_prompt(q: Question, mock: bool = False) -> str   # mock=True appends a hidden '[[gold:<x>]]' marker read only by MockClient
+WARMUP_QUESTION: Question   # (T015) fixed made-up GSM8K-style question, qid 'warmup', in no dataset or fixture
 #  GSM8K: "...Solve the problem. Show brief reasoning, then end with a final line 'Answer: <number>'."
 #  MMLU:  question + "A. ..\nB. ..\nC. ..\nD. .." + "End with a final line 'Answer: <letter>'."
 
@@ -220,6 +221,12 @@ class StrategyContext:
 STRATEGIES: dict[str, Callable[[StrategyContext], Strategy]]   # factories; each module-level strategy registers itself, run.py --all iterates the registered names in ARCH §10 order
 EdgeOnly(edge, settings) · CloudOnly(cloud, settings) · Hybrid(edge, cloud, router, settings) · RandomRouter(edge, cloud, ratio, seed, settings)
 
+# cli.py (T014)
+class ArgumentParser(argparse.ArgumentParser):   # error(): print usage to stderr, then exit 1 with '<prog>: error: <msg>'
+
+# run.py (T015)
+def warm_up(edge: ModelClient, settings: Settings, mock: bool) -> None   # one call build_prompt(WARMUP_QUESTION, mock), temperature 0, max_tokens=edge.warmup_max_tokens; ClientError -> warning
+
 # results.py
 def safe_name(model: str | None) -> str   # None -> 'none'; ':' '/' '\\' and spaces -> '-'  (qwen2.5:3b -> qwen2.5-3b); used for result AND router file names
 def result_path(results_dir, strategy, edge_model, network) -> Path   # results/<strategy>__<safe_name(edge_model)>__<network>.csv
@@ -243,7 +250,7 @@ Exit codes: 0 success, 1 user error (including argparse usage errors, via `eclm.
 - **TTFT / total:** `time.perf_counter()` immediately before sending the HTTP request. TTFT is taken at the first chunk with non-empty content, total when the stream ends.
 - **Tokens/s:** Ollama uses its final chunk: `eval_count / (eval_duration / 1e9)`. Cloud uses `usage.completion_tokens` (request `stream_options={"include_usage": True}`) divided by (total − TTFT). If usage is missing, it falls back to counting chunks.
 - **Strategy totals:** a row's `total_s` is the sum of all its calls' `total_s`. Its `ttft_s` is the sum of `total_s` of all calls before the answering call plus that call's `ttft_s`. `output_tokens` and `tokens_per_s` are the answering call's (for an edge-kept hybrid row: the first stage-2 sample whose answer equals the majority).
-- **Warm-up (T015):** before the first question of a run with an edge client (edge, hybrid, random), the runner makes one untimed call `build_prompt(WARMUP_QUESTION)` at temperature 0 with `max_tokens = edge.warmup_max_tokens` (0 = off). It writes no row, isn't memory-sampled, and a failure is only a warning. Cloud clients aren't warmed up, so a cloud run's first row includes connection setup (accepted).
+- **Warm-up (T015):** before the first question of a run with an edge client (edge, hybrid, random), the runner makes one call `build_prompt(WARMUP_QUESTION, mock=mock)` at temperature 0 with `max_tokens = edge.warmup_max_tokens` (<= 0 = off). It writes no row, isn't memory-sampled and isn't counted anywhere (its duration is only logged), and a failure is only a warning. Cloud clients aren't warmed up, so a cloud run's first row includes connection setup (accepted).
 - **Seeds:** every call passes a seed (Ollama `options.seed`, Groq `seed`): `settings.seed` for temperature-0 calls, `settings.seed + k` for the k-th stage-2 sample.
 - **Memory:** `MemorySampler` wraps every edge call. The row's `peak_mem_gb` is the max over the question's edge calls. It's blank for cloud-only rows.
 - **Offload ratio** (analysis): rows with `ran_on == "cloud"` ÷ rows.

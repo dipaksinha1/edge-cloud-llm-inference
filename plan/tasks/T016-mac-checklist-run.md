@@ -3,7 +3,7 @@
 ## Goal
 Prove the real Ollama and Groq paths work on the Mac that produces the official results, on the final code (after T014 and T015), before the full experiment.
 
-**This task is done by a person on the Mac, not by a cloud session.** Cloud sessions can't reach Ollama or Groq. A `/next-task` session that picks this task must not attempt it: it reports `RESULT: NEEDS_HUMAN` and says "T016 is Dk's Mac checklist run".
+**This task is done by a person on the Mac, not by a cloud session.** Cloud sessions can't reach Ollama or Groq. Its status in `plan/tasks.json` stays `blocked` ("waiting on Dk's Mac run"), so `/next-task` never picks it: with only T016 left it finds nothing eligible and reports `RESULT: NEEDS_HUMAN`. A cloud session must not change T016's status or commit anything for it. Dk sets it to `done` (or leaves it `blocked` with the problem) in the same commit as the PROGRESS entry.
 
 ## Context
 SPEC R1–R3, R7, R13, N5 · ARCHITECTURE §10, §11 · `docs/MAC_CHECKLIST.md` (written in T013).
@@ -30,4 +30,4 @@ The full experiment (README "Full experiment"). That follows once this is DONE.
 None.
 
 ## Notes
-If a box fails in a way that makes the official results wrong (for example `peak_mem_gb` far below `ollama ps`, or overhead over 5 %), mark this task `blocked` and don't start the full experiment until a `/replan` has decided what to do.
+If a box fails in a way that makes the official results wrong (for example `peak_mem_gb` far below `ollama ps`, or the N5 overhead still over 5 % after retrying at `memory_sample_hz: 5` as step 7 says), keep this task `blocked` with the problem in its notes and don't start the full experiment until a `/replan` has decided what to do.
