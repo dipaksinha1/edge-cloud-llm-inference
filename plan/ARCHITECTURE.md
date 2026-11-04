@@ -211,7 +211,7 @@ class Strategy(ABC):
     @abstractmethod
     def prepare(self, questions: list[Question]) -> None:                # NOT abstract: default no-op (RandomRouter overrides)
         return None
-    def meta(self) -> dict:              # (T017) NOT abstract, default {}: written to meta.json["strategy"] when a run starts
+    def meta(self) -> dict:              # (T017) NOT abstract, default {}: written to meta.json["strategy"] (if non-empty) when a run starts; {} if prepare() didn't run
     def restore(self, recorded: dict) -> None:   # (T017) NOT abstract, default no-op: called with meta.json["strategy"] before prepare() on a resume
     @abstractmethod
     def answer(self, q: Question) -> tuple[str, list[Generation], dict]   # (final text, all generations in call order, extra row fields)
@@ -263,7 +263,7 @@ Exit codes: 0 success, 1 user error (including argparse usage errors, via `eclm.
 - **Budget:** `run.py` wraps the cloud client in `BudgetedClient(max_calls_per_run)`, which raises `BudgetExceeded` *before* a call that would exceed the budget. The runner then discards the unfinished question (no row), flushes and exits 2. A restart resumes with a fresh budget. A question never makes a partial over-budget call.
 - **Logging:** `logging` at INFO to stderr, one line per run start/end plus warnings. tqdm progress bar to stderr. The API key is never logged.
 - **Secrets:** `.env` (git-ignored), with `.env.example` committed.
-- **Run metadata:** next to each CSV, `<same name>.meta.json` = `{run_id, started_at, args, config snapshot (no secrets), system_info, strategy}`. `strategy` is `Strategy.meta()`: for random `{ratio, ratio_source, cloud_questions, questions}`, else `{}` (T017). A resumed random run keeps its recorded ratio, so its cloud set never changes mid-file.
+- **Run metadata:** next to each CSV, `<same name>.meta.json` = `{run_id, started_at, args, config snapshot (no secrets), system_info}`, plus `strategy` = `Strategy.meta()` when it is non-empty: only random has one, `{ratio, ratio_source, cloud_questions, questions}` (T017). A resumed random run keeps its recorded ratio (an invalid one exits 1), so its cloud set stays the same as long as the question count is unchanged; a resume with another count (a different `--limit`) warns.
 - **Determinism:** `random.Random(settings.seed)` for selection. The random router uses `Random(seed)` over sorted qids.
 
 ## 8. Testing & `scripts/verify.sh`
