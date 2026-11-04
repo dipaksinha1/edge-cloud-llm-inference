@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eclm"
+version = "0.1.0"
+description = "Edge vs cloud vs hybrid LLM inference experiment (COSC 5756)"
+requires-python = ">=3.11"
+dependencies = [
+  "httpx>=0.28,<1",
+  "openai>=2,<4",
+  "datasets>=3,<6",
+  "scikit-learn>=1.5,<2",
+  "joblib>=1.4",
+  "numpy>=2",
+  "psutil>=6,<8",
+  "pandas>=2.2,<4",
+  "matplotlib>=3.9,<4",
+  "pyyaml>=6",
+  "python-dotenv>=1",
+  "tqdm>=4.66",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10", "types-PyYAML"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+eclm = ["fixtures/*.jsonl"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+check_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

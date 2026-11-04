@@ -31,4 +31,5 @@ Spec: `plan/SPEC.md` · Architecture & exact contracts: `plan/ARCHITECTURE.md` �
 - Done = `scripts/verify.sh` passes, every acceptance criterion is checked, and task-reviewer says PASS.
 
 ## Gotchas
-- (none yet; add one line per gotcha every future session must know)
+- `src/eclm/types.py` shadows the stdlib `types` module if you run Python with `src/eclm` as the working directory. Always run from the repo root (or `.verify_tmp/`).
+- openai ≥3.4x uses `httpx2`: pass an injected `httpx.Client` via `cast(Any, ...)` (see clients/cloud.py). If mypy results look odd, `rm -rf .mypy_cache`.

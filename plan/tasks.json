@@ -19,8 +19,8 @@
       ],
       "depends_on": [],
       "size": "M",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "Mock edge pipeline + verify.sh working; usage errors exit 1; non-mock clients raise NotImplementedError until T004/T006."
     },
     {
       "id": "T002",
@@ -34,8 +34,8 @@
         "T001"
       ],
       "size": "S",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "Tolerant GSM8K/MMLU extraction, 63 grading tests; round-2 review findings fixed after the 2-round review limit (no third review)."
     },
     {
       "id": "T003",
@@ -50,8 +50,8 @@
         "T001"
       ],
       "size": "M",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "build_datasets + offline-by-default tests (autouse conftest loader guard); 24-question fixture; verify.sh asserts 12/12 data files. Real HF download unverified here (blocked), check on Mac (T013)."
     },
     {
       "id": "T004",
@@ -66,8 +66,8 @@
         "T001"
       ],
       "size": "M",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "OllamaClient streams /api/generate (TTFT at first non-empty chunk, tps from eval_count/eval_duration, options.seed like MockClient); make_client edge real. Real Ollama unverified here, check on Mac (T013)."
     },
     {
       "id": "T005",
@@ -82,8 +82,8 @@
         "T004"
       ],
       "size": "S",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "MemorySampler + system_info in metrics.py; Strategy.edge_call wraps edge calls; run writes <csv stem>.meta.json at start. Real Ollama RSS/overhead (N5) to check on Mac (T013)."
     },
     {
       "id": "T006",
@@ -98,8 +98,8 @@
         "T005"
       ],
       "size": "M",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "CloudClient (Groq, openai SDK streaming, own 1-16 s back-off) + CloudOnly + --strategy cloud; user approved switching one line of test_unimplemented_options_exit_1 from cloud to hybrid. Real Groq to check on Mac (T013)."
     },
     {
       "id": "T007",
@@ -116,8 +116,8 @@
         "T006"
       ],
       "size": "M",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "Resume (meta + run_id kept), StrategyError rows, --all/--limit, BudgetedClient (exit 2, shared per process). test_run_edge_mock.py --all assertion swapped for --strategy random (user-approved)."
     },
     {
       "id": "T008",
@@ -133,8 +133,8 @@
         "T007"
       ],
       "size": "M",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "router.py: features/SUBJECT_GROUPS/train_router/RouterModel + train CLI. train_router has an extra keyword-only mock=False (MockClient needs the gold marker); ARCH §5 signature should list it in a /replan. Router.decide left for T009."
     },
     {
       "id": "T009",
@@ -149,8 +149,8 @@
         "T008"
       ],
       "size": "M",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "Router/Hybrid/MeteredClient done; --all now builds strategies before any question; 3 test_run_resume tests updated (user-approved) to include hybrid."
     },
     {
       "id": "T010",
@@ -164,8 +164,8 @@
         "T009"
       ],
       "size": "S",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "RandomRouter resolves the ratio in prepare() (--ratio or the hybrid CSV); 2 --all expectations in test_run_resume.py updated with user approval."
     },
     {
       "id": "T011",
@@ -179,8 +179,8 @@
         "T010"
       ],
       "size": "S",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "analyze.py: load_results/summarize/summary.csv+md; extra --config flag (defaults from config.yaml) to record in ARCH via /replan."
     },
     {
       "id": "T012",
@@ -194,8 +194,8 @@
         "T011"
       ],
       "size": "M",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "make_figures in analyze.py: 4 figures PNG(300dpi)+PDF, fig3_tradeoff.csv side-file; missing data -> warning + what exists."
     },
     {
       "id": "T013",
@@ -211,8 +211,113 @@
         "T012"
       ],
       "size": "S",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "README (setup, mock quick test, --limit 5 smoke into smoke_results/, full run, per-OS degradation + undo, outputs, troubleshooting) + docs/MAC_CHECKLIST.md (incl. N5 overhead and MMLU snippets); tests/test_readme_commands.py parses every eclm command in both docs."
+    },
+    {
+      "id": "T014",
+      "title": "Usage errors exit 1 in every CLI",
+      "milestone": "M4",
+      "brief": "plan/tasks/T014-cli-exit-codes.md",
+      "requirements": [
+        "N3"
+      ],
+      "depends_on": [
+        "T013"
+      ],
+      "size": "S",
+      "status": "done",
+      "notes": "eclm.cli.ArgumentParser (usage errors exit 1) replaces both _Parser copies and stock argparse in data/analyze; tests/test_cli.py + verify.sh smoke check '--bogus exits 1' for all four CLIs."
+    },
+    {
+      "id": "T015",
+      "title": "Warm up the edge model before a run's first timed question",
+      "milestone": "M4",
+      "brief": "plan/tasks/T015-edge-warmup.md",
+      "requirements": [
+        "R2",
+        "R7"
+      ],
+      "depends_on": [
+        "T013"
+      ],
+      "size": "S",
+      "status": "done",
+      "notes": "warm_up() in run.py: one generate(build_prompt(WARMUP_QUESTION), temp 0, max_tokens=edge.warmup_max_tokens) per edge/hybrid/random run before the first question; unsampled, unrecorded, ClientError -> warning. 10 tests in tests/test_warmup.py + verify.sh log checks."
+    },
+    {
+      "id": "T016",
+      "title": "Run the Mac real-backend checklist (Dk, on the Mac)",
+      "milestone": "M4",
+      "brief": "plan/tasks/T016-mac-checklist-run.md",
+      "requirements": [
+        "R1",
+        "R2",
+        "R3",
+        "R7",
+        "R13",
+        "N5"
+      ],
+      "depends_on": [
+        "T014",
+        "T015",
+        "T017",
+        "T018",
+        "T019"
+      ],
+      "size": "M",
+      "status": "blocked",
+      "notes": "Waiting on Dk's Mac run (human task, after T014/T015/T017–T019). Cloud sessions: don't pick it or change its status. Dk sets it done with the PROGRESS entry."
+    },
+    {
+      "id": "T017",
+      "title": "Record the resolved random ratio in meta.json",
+      "milestone": "M4",
+      "brief": "plan/tasks/T017-random-ratio-in-meta.md",
+      "requirements": [
+        "R6",
+        "R10",
+        "R13"
+      ],
+      "depends_on": [
+        "T013"
+      ],
+      "size": "S",
+      "status": "done",
+      "notes": "Strategy.meta()/restore(); random writes meta.json['strategy'] {ratio, ratio_source, cloud_questions, questions} and a resume keeps the recorded ratio (warns if the source changed or the question count differs). Other strategies write no 'strategy' key (test_metrics asserts the exact key set)."
+    },
+    {
+      "id": "T018",
+      "title": "Count a failed stage-2 edge sample's time in total_s",
+      "milestone": "M4",
+      "brief": "plan/tasks/T018-failed-sample-time.md",
+      "requirements": [
+        "R4",
+        "R7"
+      ],
+      "depends_on": [
+        "T017"
+      ],
+      "size": "S",
+      "status": "done",
+      "notes": "Router.decide times each stage-2 sample; Decision.failed_edge_s = ((completed_before, s), ...); Hybrid passes it in extra; combine_timings adds it to total_s, and to ttft_s when before the answering call. edge_calls unchanged. 7 tests in tests/test_failed_sample_time.py."
+    },
+    {
+      "id": "T019",
+      "title": "Fix the open README, checklist and doc-test findings from the T013 code review",
+      "milestone": "M4",
+      "brief": "plan/tasks/T019-doc-review-fixes.md",
+      "requirements": [
+        "R9",
+        "R10",
+        "R11"
+      ],
+      "depends_on": [
+        "T018"
+      ],
+      "size": "S",
+      "status": "done",
+      "notes": "README (hybrid redo -> also random, rm -rf mock_test + PowerShell line, data/router need no Groq key), checklist (N5 uses memory_sampler, step 8 checks labels on mock figures), doc-test extractor (redirects + fd digit, prefixed commands, heredocs skipped) with 3 new tests."
     }
   ]
 }
