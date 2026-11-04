@@ -11,10 +11,11 @@ import sys
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import Any
 
 from tqdm import tqdm
 
+from eclm import cli
 from eclm.clients import BudgetedClient, BudgetExceeded, ClientUnavailable, ModelClient, make_client
 from eclm.config import ConfigError, Settings, load_settings
 from eclm.data import TEST_FILE, load_questions
@@ -29,16 +30,8 @@ log = logging.getLogger("eclm.run")
 STRATEGY_NAMES = ("edge", "cloud", "hybrid", "random")
 
 
-class _Parser(argparse.ArgumentParser):
-    """Usage errors exit 1 (ARCHITECTURE §5: exit 2 is reserved for 'budget reached')."""
-
-    def error(self, message: str) -> NoReturn:
-        self.print_usage(sys.stderr)
-        self.exit(1, f"{self.prog}: error: {message}\n")
-
-
 def build_parser() -> argparse.ArgumentParser:
-    p = _Parser(prog="python -m eclm.run", description="Run one strategy over the test set.")
+    p = cli.ArgumentParser(prog="python -m eclm.run", description="Run one strategy over the test set.")
     p.add_argument("--strategy", choices=STRATEGY_NAMES)
     p.add_argument("--edge-model")
     p.add_argument("--network", choices=("normal", "degraded"), required=True)

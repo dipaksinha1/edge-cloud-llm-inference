@@ -226,8 +226,8 @@
         "T013"
       ],
       "size": "S",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "eclm.cli.ArgumentParser (usage errors exit 1) replaces both _Parser copies and stock argparse in data/analyze; tests/test_cli.py + verify.sh smoke check '--bogus exits 1' for all four CLIs."
     },
     {
       "id": "T015",

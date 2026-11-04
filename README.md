@@ -304,7 +304,7 @@ git push
 | `test_questions.jsonl not found` | `error: data/test_questions.jsonl not found; run python -m eclm.data first` | Run `python -m eclm.data` from the repository folder. |
 | `config file not found` | `error: config file not found: config.yaml` | Run the commands from the repository folder (where `config.yaml` is). |
 
-Exit codes of `python -m eclm.run`: `0` = done, `1` = a problem to fix first (message above), `2` = cloud budget reached (rerun to resume). (A mistyped option to `eclm.data` or `eclm.analyze` also exits with `2`; that is just the option error, not the budget.)
+Exit codes (every command): `0` = done, `1` = a problem to fix first (a message above, or a mistyped option), `2` = cloud budget reached (only `eclm.run`; rerun to resume).
 
 ## For developers
 

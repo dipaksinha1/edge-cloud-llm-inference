@@ -17,6 +17,7 @@ matplotlib.use("Agg")  # before pyplot: no display needed
 import matplotlib.pyplot as plt  # noqa: E402
 import pandas as pd  # noqa: E402
 
+from eclm import cli  # noqa: E402
 from eclm.config import ConfigError, load_settings  # noqa: E402
 from eclm.types import RESULT_COLUMNS  # noqa: E402
 
@@ -313,7 +314,7 @@ def make_figures(summary_df: pd.DataFrame, results_df: pd.DataFrame, figures_dir
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="python -m eclm.analyze", description="Summarise the result CSVs.")
+    p = cli.ArgumentParser(prog="python -m eclm.analyze", description="Summarise the result CSVs.")
     p.add_argument("--results-dir", help="default: results_dir from the config")
     p.add_argument("--figures-dir", help="default: figures_dir from the config")
     p.add_argument("--config", default="config.yaml")

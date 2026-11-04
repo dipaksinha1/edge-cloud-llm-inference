@@ -16,6 +16,7 @@ from collections.abc import Callable
 from importlib import resources
 from pathlib import Path
 
+from eclm import cli
 from eclm.config import ConfigError, Settings, load_settings
 from eclm.grading import _normalise, _to_decimal
 from eclm.types import Dataset, Question
@@ -201,7 +202,7 @@ def build_datasets(settings: Settings) -> tuple[list[Question], list[Question]]:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="python -m eclm.data", description="Build the question sets.")
+    p = cli.ArgumentParser(prog="python -m eclm.data", description="Build the question sets.")
     p.add_argument("--config", default="config.yaml")
     p.add_argument("--mock", action="store_true", help="write the bundled fixture split (no network)")
     return p

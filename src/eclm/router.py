@@ -13,11 +13,12 @@ import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import Any
 
 import joblib
 from sklearn.linear_model import LogisticRegression
 
+from eclm import cli
 from eclm.clients import ClientError, ClientUnavailable, ModelClient, make_client
 from eclm.config import ConfigError, Settings, load_settings
 from eclm.data import CALIBRATION_FILE, load_questions
@@ -273,17 +274,9 @@ def train_router(
     )
 
 
-class _Parser(argparse.ArgumentParser):
-    """Usage errors exit 1 (ARCHITECTURE §5)."""
-
-    def error(self, message: str) -> NoReturn:
-        self.print_usage(sys.stderr)
-        self.exit(1, f"{self.prog}: error: {message}\n")
-
-
 def build_parser() -> argparse.ArgumentParser:
-    p = _Parser(prog="python -m eclm.router", description="Train the stage-1 router for an edge model.")
-    sub = p.add_subparsers(dest="command", required=True, parser_class=_Parser)
+    p = cli.ArgumentParser(prog="python -m eclm.router", description="Train the stage-1 router for an edge model.")
+    sub = p.add_subparsers(dest="command", required=True, parser_class=cli.ArgumentParser)
     train = sub.add_parser("train", help="train and save models/router_<edge model>.joblib")
     train.add_argument("--edge-model", required=True)
     train.add_argument("--config", default="config.yaml")

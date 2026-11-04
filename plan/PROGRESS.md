@@ -1,7 +1,7 @@
 # Progress
 
 ## Project state
-- Phase: **M1 complete** (T001–T003), **M2 complete** (T004–T007). **M3 complete** (T008–T010). M4: T011–T013 done, T014–T015 todo, T016 blocked (waiting on Dk's Mac run), T017–T018 proposed. Next: T014 (CLI exit codes), then T015 (edge warm-up), then Dk runs T016 (docs/MAC_CHECKLIST.md on the Mac), then the full experiment. PRs build → main for M1/M2 are still pending.
+- Phase: **M1 complete** (T001–T003), **M2 complete** (T004–T007). **M3 complete** (T008–T010). M4: T011–T014 done, T015 todo, T016 blocked (waiting on Dk's Mac run), T017–T018 proposed. Next: T015 (edge warm-up), then Dk runs T016 (docs/MAC_CHECKLIST.md on the Mac), then the full experiment. PRs build → main for M1/M2 are still pending.
 - Spec: plan/SPEC.md (R1–R13, N1–N6). Architecture: plan/ARCHITECTURE.md. ADRs 0001–0006.
 - 18 tasks in 4 milestones: M1 mock pipeline (T001–T003) · M2 real backends (T004–T007) · M3 hybrid + random (T008–T010) · M4 analysis, run guide, Mac checks (T011–T018). T016 is a human task, kept `blocked` so cloud sessions skip it.
 - Workflow: one task per fresh Claude Code cloud session via /next-task, commits on `build`, pushed after each task. Milestones merged to `main` via PR reviewed by Dk.
@@ -117,3 +117,8 @@
 - Architecture: §3 adds cli.py. §4 adds `edge.warmup_max_tokens: 1` (0 = off). §5 records the existing `mock=` keyword on train_router and Router, `analyze --config`, and the exit-1 usage errors. §6 adds the warm-up rule and says "answering call" (as built in T009). These were drift items from the T008/T009/T011 PROGRESS entries.
 - Not changed: SPEC and ADRs. Q1 (router threshold) is still open.
 - Cold audit (finished after the first replan commit), fixes in a second commit: T016 is `blocked` ("waiting on Dk") so /next-task never picks it and can't leave it stuck in_progress. T015 no longer depends on T014, `<= 0` turns the warm-up off (no new validation), warm-up placement before tqdm, how to test "not sampled", a numeric row-1 check, and verify.sh smoke checks for T014 and T015. ARCH §3/§5 list cli.ArgumentParser, WARMUP_QUESTION and warm_up. The checklist's step 9 now matches T016 (heading, fields, `git add data`). The T009 and T010 follow-ups are now proposed T017 and T018.
+
+## 2026-11-04 · T014 · Usage errors exit 1 in every CLI · DONE
+- Did: new `src/eclm/cli.py` with `ArgumentParser` (usage → stderr, exit 1, `<prog>: error: <msg>`). run.py and router.py drop their private `_Parser` copies (router's `train` subparser uses it via `parser_class`). data.py and analyze.py switch from stock argparse. README's exit-code line now covers every command. verify.sh smoke checks that `data`, `router train`, `run` and `analyze` with `--bogus` exit 1. 23 tests in tests/test_cli.py.
+- Decisions: the smoke check covers all four CLIs, not only data/analyze as the brief asked (cheap, and it guards run/router too). Flags, help texts and prog names are unchanged.
+- Verified: verify.sh PASS. AC1: unknown option per module (parser and `main`) plus 6 bad values (bad choice, bad int, missing required option, unknown subcommand) all exit 1 with `error:` on stderr. AC2: `--help` exits 0 for all four. AC3: `grep -rn "class _Parser" src` prints nothing. AC4: README line read; test_readme_commands passes. AC5: smoke check added. Mutation: data.py reverted to stock argparse → exit 2, 3 test_cli failures; restored. By hand: `data --bogus` and `analyze --bogus` print `1`.
