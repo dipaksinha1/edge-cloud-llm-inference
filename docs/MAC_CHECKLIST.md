@@ -51,9 +51,11 @@ python -m eclm.run --strategy edge --edge-model qwen2.5:3b --network normal --li
 
 While it runs, in a second terminal run `ollama ps` and write down the `SIZE` shown for `qwen2.5:3b`.
 
-Expected: `INFO run ... (5 of 5 questions to do)`, a progress bar to 5/5, then `INFO run ... finished`. Open `smoke_results/edge__qwen2.5-3b__normal.csv`:
+Expected: `INFO run ... (5 of 5 questions to do)`, then `INFO warm-up qwen2.5:3b done in <s> s`, a progress bar to 5/5, then `INFO run ... finished`. Open `smoke_results/edge__qwen2.5-3b__normal.csv`:
 
+- [ ] The warm-up line appears before the progress bar, with no `WARNING warm-up for ... failed`. (If the model wasn't loaded yet, `<s>` is the load time, often several seconds; that time is not in any row.)
 - [ ] 5 rows, `error` empty, `ran_on` = `edge`, `edge_calls` = 1, `cloud_calls` = 0.
+- [ ] Row 1's `ttft_s` is under 2× the median `ttft_s` of rows 2–5 (the warm-up took the model load, so row 1 isn't an outlier).
 - [ ] `tokens_per_s` plausible for Apple Silicon: roughly 20–100 for qwen2.5:3b (not 0, not thousands).
 - [ ] `ttft_s` is smaller than `total_s` on every row; `output_tokens` > 0.
 - [ ] `peak_mem_gb` is filled on every row and close to the `ollama ps` SIZE (within about 30 %). If it is far below (for example under 0.5 GB), the sampler isn't seeing the model's memory (on Apple Silicon the weights may sit in GPU/unified memory that process RSS doesn't count): record this as a limitation.
@@ -99,7 +101,7 @@ python -m eclm.run --strategy edge --edge-model qwen2.5:3b --network degraded --
 Turn the degradation **off** again and check `ping` is back to normal. Then compare with the normal runs from steps 3 and 4:
 
 - [ ] Cloud `ttft_s` and `total_s` (in `smoke_results/cloud__none__degraded.csv`) are clearly higher than in `cloud__none__normal.csv` (at least about 0.2 s more on average).
-- [ ] Edge `ttft_median` for `edge qwen2.5:3b degraded` is about the same as for `normal` in `smoke_results/summary.md` (made by the `analyze` command below), less than about 0.1 s apart. Use the median, not the first row: the first edge row of a run can include loading the model. If it is 0.1 s or more higher, the shaping is also slowing `localhost`: use the `dnctl`/`pfctl` option, which skips `lo0`, and repeat this step.
+- [ ] Edge `ttft_median` for `edge qwen2.5:3b degraded` is about the same as for `normal` in `smoke_results/summary.md` (made by the `analyze` command below), less than about 0.1 s apart. If it is 0.1 s or more higher, the shaping is also slowing `localhost`: use the `dnctl`/`pfctl` option, which skips `lo0`, and repeat this step.
 
 A quick way to compare averages and medians (needs no extra installs):
 
@@ -107,7 +109,7 @@ A quick way to compare averages and medians (needs no extra installs):
 python -m eclm.analyze --results-dir smoke_results --figures-dir smoke_figures
 ```
 
-and read the `ttft_mean` and `total_mean` columns in `smoke_results/summary.md`.
+and read the `ttft_mean`, `ttft_median` and `total_mean` columns in `smoke_results/summary.md`.
 
 ## 7. Memory sampler overhead (N5: under 5 %)
 

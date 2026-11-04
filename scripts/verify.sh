@@ -23,6 +23,8 @@ check() {  # check <name> <condition...>
 }
 
 rows() { echo $(( $(wc -l < "$1") - 1 )); }   # data rows in a CSV (minus header)
+in_log() { grep -q "$1" "$LOG"; }        # the last step's output contains $1
+not_in_log() { ! grep -q "$1" "$LOG"; }  # ... and doesn't contain $1
 usage_error() {  # usage_error <command...>: exits 1 with argparse's "unrecognized arguments: --bogus" (not a crash)
   local out rc
   out="$("$@" 2>&1)"; rc=$?
@@ -44,6 +46,9 @@ done
 step "smoke: router train --mock" "$PY" -m eclm.router train --edge-model qwen2.5:3b --mock
 check "smoke: models/router_qwen2.5-3b.joblib" test -s models/router_qwen2.5-3b.joblib
 step "smoke: run --all normal" "$PY" -m eclm.run --all --network normal --mock
+# edge models are warmed up before a run's first question, and no warm-up failed (T015)
+check "smoke: run --all warmed up qwen2.5:3b" in_log "warm-up qwen2.5:3b done"
+check "smoke: run --all had no failed warm-up" not_in_log "warm-up for"
 step "smoke: run edge degraded" "$PY" -m eclm.run --strategy edge --edge-model qwen2.5:3b --network degraded --mock
 step "smoke: run random degraded" "$PY" -m eclm.run --strategy random --edge-model qwen2.5:3b --ratio 0.25 \
   --network degraded --mock

@@ -8,6 +8,7 @@ import argparse
 import json
 import logging
 import sys
+import time
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,11 +17,12 @@ from typing import Any
 from tqdm import tqdm
 
 from eclm import cli
-from eclm.clients import BudgetedClient, BudgetExceeded, ClientUnavailable, ModelClient, make_client
+from eclm.clients import BudgetedClient, BudgetExceeded, ClientError, ClientUnavailable, ModelClient, make_client
 from eclm.config import ConfigError, Settings, load_settings
 from eclm.data import TEST_FILE, load_questions
 from eclm.grading import extract_answer, is_correct
 from eclm.metrics import system_info
+from eclm.prompts import WARMUP_QUESTION, build_prompt
 from eclm.results import ResultWriter, done_qids, result_path
 from eclm.strategies import STRATEGIES, Strategy, StrategyContext, StrategyError, StrategyUnavailable
 from eclm.types import Generation, Question, Result
@@ -212,6 +214,23 @@ def _read_run_id(meta_file: Path) -> str | None:
     return run_id if isinstance(run_id, str) and run_id else None
 
 
+def warm_up(edge: ModelClient, settings: Settings, mock: bool) -> None:
+    """One edge call before a run's first question, so row 1 doesn't include loading the model (ARCH §6).
+
+    Not memory-sampled, writes no row, counted nowhere. A failure is only a warning: question 1 then
+    fails or succeeds on its own.
+    """
+    start = time.perf_counter()
+    try:
+        edge.generate(
+            build_prompt(WARMUP_QUESTION, mock=mock), temperature=0.0, max_tokens=settings.edge.warmup_max_tokens
+        )
+    except ClientError as exc:
+        log.warning("warm-up for %s failed: %s", edge.name, exc)
+        return
+    log.info("warm-up %s done in %.2f s", edge.name, time.perf_counter() - start)
+
+
 def run_combo(
     combo: Combo,
     strategy: Strategy,
@@ -241,6 +260,8 @@ def run_combo(
         log.info("run %s -> %s already complete (%d questions)", run_id, path, len(questions))
         return 0
     log.info("run %s -> %s (%d of %d questions to do)", run_id, path, len(todo), len(questions))
+    if ctx.edge is not None and settings.edge.warmup_max_tokens > 0:
+        warm_up(ctx.edge, settings, args.mock)  # before tqdm, which draws 0/N as soon as it is created
     desc = f"{strategy.name} {edge_model or cloud_model} {args.network}"
     with ResultWriter(path) as writer, tqdm(
         total=len(questions), initial=len(questions) - len(todo), desc=desc, file=sys.stderr

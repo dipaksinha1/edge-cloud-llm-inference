@@ -14,6 +14,7 @@ edge:
   hybrid_model: qwen2.5:3b
   timeout_s: 300
   memory_sample_hz: 10
+  warmup_max_tokens: 1  # one unrecorded edge call before a run's first question; <= 0 = off
 cloud:
   base_url: https://api.groq.com/openai/v1
   model: llama-3.3-70b-versatile

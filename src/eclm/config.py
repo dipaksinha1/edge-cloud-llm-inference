@@ -26,6 +26,7 @@ class EdgeSettings:
     hybrid_model: str
     timeout_s: float
     memory_sample_hz: float
+    warmup_max_tokens: int
 
 
 @dataclass(frozen=True)

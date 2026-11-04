@@ -242,8 +242,8 @@
         "T013"
       ],
       "size": "S",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "warm_up() in run.py: one generate(build_prompt(WARMUP_QUESTION), temp 0, max_tokens=edge.warmup_max_tokens) per edge/hybrid/random run before the first question; unsampled, unrecorded, ClientError -> warning. 10 tests in tests/test_warmup.py + verify.sh log checks."
     },
     {
       "id": "T016",
