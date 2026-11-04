@@ -192,6 +192,8 @@ class Hybrid(Strategy):
             "difficulty": f"{decision.difficulty:.4f}",
             "agreement": "" if decision.agreement is None else f"{decision.agreement}/{self.settings.router.samples}",
         }
+        if decision.failed_edge_s:
+            extra["failed_edge_s"] = decision.failed_edge_s
         if decision.route == "edge" and decision.edge_answer is not None:
             majority = decision.edge_answer
             index = next(

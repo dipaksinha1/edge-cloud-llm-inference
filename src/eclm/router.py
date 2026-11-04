@@ -10,6 +10,7 @@ import argparse
 import logging
 import re
 import sys
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -27,6 +28,7 @@ from eclm.prompts import build_prompt
 from eclm.results import safe_name
 from eclm.types import Decision, Generation, Question
 
+_clock = time.perf_counter  # timer for failed stage-2 samples (tests replace it with a fake clock)
 log = logging.getLogger("eclm.router")
 
 FEATURES = [
@@ -209,12 +211,15 @@ class Router:
         prompt = build_prompt(q, mock=self.mock)
         gens: list[Generation] = []
         answers: list[str | None] = []
+        failed: list[tuple[int, float]] = []
         for _ in range(cfg.samples):
+            start = _clock()
             try:
                 gen = self.edge.generate(
                     prompt, temperature=cfg.sample_temperature, max_tokens=self.settings.generation.max_tokens
                 )
-            except ClientError as exc:  # counts as an unparseable answer (ARCHITECTURE §7)
+            except ClientError as exc:  # counts as an unparseable answer (§7); its time still counts (§6)
+                failed.append((len(gens), _clock() - start))
                 log.warning("edge sample failed on %s (counted as unparseable): %s", q.qid, exc)
                 answers.append(None)
                 continue
@@ -224,9 +229,9 @@ class Router:
         agreement = largest_group(answers, q.dataset)
         if majority is None:
             return Decision(route="cloud", stage=2, difficulty=difficulty, agreement=agreement,
-                            edge_generations=tuple(gens), edge_answer=None)
+                            edge_generations=tuple(gens), edge_answer=None, failed_edge_s=tuple(failed))
         return Decision(route="edge", stage=None, difficulty=difficulty, agreement=agreement,
-                        edge_generations=tuple(gens), edge_answer=majority)
+                        edge_generations=tuple(gens), edge_answer=majority, failed_edge_s=tuple(failed))
 
 
 def edge_labels(settings: Settings, edge: ModelClient, calibration: list[Question], *, mock: bool = False) -> list[int]:

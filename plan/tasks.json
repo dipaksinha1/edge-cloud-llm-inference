@@ -299,8 +299,8 @@
         "T017"
       ],
       "size": "S",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "Router.decide times each stage-2 sample; Decision.failed_edge_s = ((completed_before, s), ...); Hybrid passes it in extra; combine_timings adds it to total_s, and to ttft_s when before the answering call. edge_calls unchanged. 7 tests in tests/test_failed_sample_time.py."
     },
     {
       "id": "T019",

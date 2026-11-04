@@ -50,16 +50,22 @@ def now_utc() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
-def combine_timings(gens: list[Generation], answer_index: int | None = None) -> tuple[float, float]:
+def combine_timings(
+    gens: list[Generation], answer_index: int | None = None, failed: tuple[tuple[int, float], ...] = ()
+) -> tuple[float, float]:
     """(ttft_s, total_s) for a row, per ARCHITECTURE §6.
 
-    total = sum of every call's total. ttft = totals of the calls before the answering call + its TTFT.
-    The answering call is the last one unless `answer_index` says otherwise (hybrid kept on the edge).
+    total = sum of every call's total + every failed stage-2 sample's time. ttft = totals of the calls before
+    the answering call + its TTFT + the failed samples before it (`failed` holds (calls completed before the
+    failure, seconds)). The answering call is the last one unless `answer_index` says otherwise.
     """
+    failed_total = sum(s for _, s in failed)
     if not gens:
-        return 0.0, 0.0
+        return 0.0, failed_total
     i = len(gens) - 1 if answer_index is None else answer_index
-    return sum(g.total_s for g in gens[:i]) + gens[i].ttft_s, sum(g.total_s for g in gens)
+    failed_before = sum(s for pos, s in failed if pos <= i)
+    ttft = sum(g.total_s for g in gens[:i]) + gens[i].ttft_s + failed_before
+    return ttft, sum(g.total_s for g in gens) + failed_total
 
 
 def _fmt(value: float | None) -> str:
@@ -80,7 +86,7 @@ def build_result(
     error: str = "",
 ) -> Result:
     answer_index = extra.get("answer_index") if not error else None
-    ttft, total = combine_timings(gens, answer_index)
+    ttft, total = combine_timings(gens, answer_index, tuple(extra.get("failed_edge_s", ())))
     final = (gens[-1] if answer_index is None else gens[answer_index]) if gens else None
     predicted = extra.get("predicted")
     if predicted is None and text:

@@ -43,6 +43,8 @@ class Decision:
     agreement: int | None
     edge_generations: tuple[Generation, ...]
     edge_answer: str | None
+    # per failed stage-2 sample: (samples completed before it, seconds it took); counted in the row's latency (§6)
+    failed_edge_s: tuple[tuple[int, float], ...] = ()
 
 
 @dataclass(frozen=True)
