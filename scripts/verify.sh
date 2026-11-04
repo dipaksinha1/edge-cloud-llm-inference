@@ -56,5 +56,11 @@ N_CSV=$(find results -maxdepth 1 -name '*.csv' ! -name summary.csv | wc -l)
 step "smoke: analyze" "$PY" -m eclm.analyze
 check "smoke: results/summary.csv has $N_CSV rows" test -f results/summary.csv -a "$(rows results/summary.csv 2>/dev/null || echo 0)" -eq "$N_CSV"
 check "smoke: results/summary.md" test -s results/summary.md
+for FIG in fig1_accuracy fig2_latency fig3_tradeoff fig4_memory; do
+  for EXT in png pdf; do
+    check "smoke: figures/$FIG.$EXT" test -s "figures/$FIG.$EXT"
+  done
+done
+check "smoke: figures/fig3_tradeoff.csv" test -s figures/fig3_tradeoff.csv
 
 echo "VERIFY: PASS"

@@ -1,7 +1,7 @@
 # Progress
 
 ## Project state
-- Phase: **M1 complete** (T001–T003), **M2 complete** (T004–T007). **M3 complete** (T008–T010). M4 started: T011 done. Next: T012 (report figures). PRs build → main for M1/M2 are still pending.
+- Phase: **M1 complete** (T001–T003), **M2 complete** (T004–T007). **M3 complete** (T008–T010). M4: T011, T012 done. Next: T013 (README run guide + Mac checklist). PRs build → main for M1/M2 are still pending.
 - Spec: plan/SPEC.md (R1–R13, N1–N6). Architecture: plan/ARCHITECTURE.md. ADRs 0001–0006.
 - 13 tasks in 4 milestones: M1 mock pipeline (T001–T003) · M2 real backends (T004–T007) · M3 hybrid + random (T008–T010) · M4 analysis + run guide (T011–T013).
 - Workflow: one task per fresh Claude Code cloud session via /next-task, commits on `build`, pushed after each task. Milestones merged to `main` via PR reviewed by Dk.
@@ -96,3 +96,10 @@
 - Gotchas: this session also ran T010 first, because the user invoked /next-task twice.
 - Verified: verify.sh PASS. AC1 by hand-computed edge/cloud/hybrid groups (every column). AC2 by an error row with outlier timings (means unchanged, accuracy and error_rate 0.5) plus an all-error group. AC3 by four empty cases (missing dir, empty dir, header-only, summary-only) plus a manual CLI run (exit 1, "no results found"). AC4/5 by verify.sh. Reviewer: PASS, and non-blocking item 3 (malformed CSV) was fixed.
 - Follow-ups: the report should say that hybrid/random mem_peak_mean covers edge rows only. In mock mode the degraded network doesn't change edge timings (MockClient behaviour), so check it on the Mac.
+
+## 2026-11-04 · T012 · Analysis: report figures · DONE
+- Did: `make_figures(summary_df, results_df, figures_dir)` in analyze.py writes fig1_accuracy, fig2_latency, fig3_tradeoff and fig4_memory as PNG (300 dpi) and PDF, plus figures/fig3_tradeoff.csv (label, strategy, edge_model, x, y). `fig3_points()` builds the side-file. `analyze` now also writes figures (`--figures-dir` defaults to config figures_dir) and logs at INFO. verify.sh asserts the 8 figure files and the side-file. 5 new tests in tests/test_analyze.py.
+- Decisions: 3.5 × 2.6 in, 8 pt, PDF fonttype 42, Okabe-Ito palette, no titles. Slanted x labels and legends above the axes (checked visually: 6 labels overlapped when horizontal). fig4 = mean bar + max tick of non-error edge-only rows, using the normal network when present. A figure with no data at all gets a "no data" placeholder. Every missing strategy or network logs a warning on `eclm.analyze`.
+- Gotchas: mypy rejected `plt.rc_context(dict[str, Any])` (Literal-key stubs) only on a cold cache, so it's passed via `cast(Any, ...)`. This session also ran T010 and T011 (the user invoked /next-task three times).
+- Verified: verify.sh PASS. AC1 by smoke `test -s` on the 8 files plus a pipeline test checking PNG/PDF magic bytes, and a 300 dpi pixel-size test. AC2 by a normal-only, no-random test and a degraded-cloud-only test (files written, warnings asserted). AC3 by reading the side-file back and comparing it with summary offload_ratio/accuracy. All 4 PNGs were looked at. Reviewer: PASS, and non-blocking item 1 (fig3 legend placement) was fixed.
+- Follow-ups: figure styling constants are in code (ARCH §4 has no figure keys). Re-check the label fit with the real model set on the Mac (T013).

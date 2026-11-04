@@ -208,3 +208,88 @@ def test_csv_without_result_columns_exits_1(handmade: Path, capsys: pytest.Captu
     assert analyze.main(["--results-dir", str(handmade)]) == 1
     err = capsys.readouterr().err
     assert "notes.csv is not a result file" in err and "strategy" in err
+
+
+# --- T012: figures --------------------------------------------------------------------------------------
+
+FIGURE_FILES = {f"{n}.{e}" for n in analyze.FIGURE_NAMES for e in ("png", "pdf")}
+
+
+def _figures_ok(figdir: Path) -> None:
+    assert FIGURE_FILES | {analyze.FIG3_SIDE_FILE} <= {p.name for p in figdir.iterdir()}
+    for name in FIGURE_FILES:
+        assert (figdir / name).stat().st_size > 0
+    for name in analyze.FIGURE_NAMES:
+        assert (figdir / f"{name}.png").read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+        assert (figdir / f"{name}.pdf").read_bytes()[:5] == b"%PDF-"
+
+
+def test_figures_from_full_mock_pipeline(workdir: Path) -> None:
+    assert data.main(["--mock"]) == 0
+    assert router.main(["train", "--edge-model", "qwen2.5:3b", "--mock"]) == 0
+    assert run.main(["--all", "--network", "normal", "--mock"]) == 0
+    assert run.main(["--strategy", "edge", "--edge-model", "qwen2.5:3b", "--network", "degraded", "--mock"]) == 0
+    assert analyze.main([]) == 0
+    _figures_ok(workdir / "figures")  # default figures_dir from config.yaml
+
+
+def test_png_is_300_dpi_single_column(handmade: Path, tmp_path: Path) -> None:
+    from matplotlib import image
+
+    df = analyze.load_results(handmade)
+    analyze.make_figures(analyze.summarize(df), df, tmp_path / "figs")
+    height, width = image.imread(tmp_path / "figs" / "fig1_accuracy.png").shape[:2]
+    assert width == pytest.approx(analyze.FIG_WIDTH_IN * analyze.FIG_DPI, abs=2)
+    assert height == pytest.approx(analyze.FIG_HEIGHT_IN * analyze.FIG_DPI, abs=2)
+
+
+# --- AC2: missing degraded data or strategy -> figures still produced, warning logged ------------------
+
+
+def test_missing_degraded_and_strategies_warns_but_writes(handmade: Path, tmp_path: Path,
+                                                           caplog: pytest.LogCaptureFixture) -> None:
+    df = analyze.load_results(handmade)  # normal only, no random
+    with caplog.at_level("WARNING", logger="eclm.analyze"):
+        paths = analyze.make_figures(analyze.summarize(df), df, tmp_path / "figs")
+    _figures_ok(tmp_path / "figs")
+    assert len(paths) == 9
+    messages = " ".join(r.getMessage() for r in caplog.records)
+    assert "fig2_latency: no degraded-network results" in messages
+    assert "no normal results for random" in messages
+
+
+def test_only_degraded_cloud_results_still_writes_every_figure(tmp_path: Path,
+                                                                caplog: pytest.LogCaptureFixture) -> None:
+    _write(tmp_path / "results" / "cloud__none__degraded.csv",
+           [_row(qid="a", strategy="cloud", edge_model="", network="degraded", ran_on="cloud", total_s=2.0)])
+    with caplog.at_level("WARNING", logger="eclm.analyze"):
+        assert analyze.main(["--results-dir", str(tmp_path / "results"), "--figures-dir", str(tmp_path / "f")]) == 0
+    _figures_ok(tmp_path / "f")
+    messages = " ".join(r.getMessage() for r in caplog.records)
+    assert "fig1_accuracy: no normal-network results" in messages
+    assert "fig4_memory: no edge-only memory samples" in messages
+    assert "fig2_latency: no normal-network results" in messages
+    assert pd.read_csv(tmp_path / "f" / analyze.FIG3_SIDE_FILE).empty
+
+
+# --- AC3: fig3 side-file equals the summary -------------------------------------------------------------
+
+
+def test_fig3_side_file_matches_summary(handmade: Path, tmp_path: Path) -> None:
+    _write(handmade / "random__m1__normal.csv",
+           [_row(qid="a", strategy="random", ran_on="cloud", correct=True), _row(qid="b", strategy="random")])
+    _write(handmade / "edge__m1__degraded.csv", [_row(qid="a", network="degraded", correct=True)])
+    df = analyze.load_results(handmade)
+    summary = analyze.summarize(df)
+    analyze.make_figures(summary, df, tmp_path / "figs")
+    side = pd.read_csv(tmp_path / "figs" / analyze.FIG3_SIDE_FILE, keep_default_na=False)
+    assert list(side.columns) == ["label", "strategy", "edge_model", "x", "y"]
+    normal = summary[summary["network"] == "normal"].reset_index(drop=True)
+    assert list(side["strategy"]) == list(normal["strategy"]) == ["edge", "cloud", "hybrid", "random"]
+    assert list(side["edge_model"]) == list(normal["edge_model"])
+    assert side["x"].tolist() == pytest.approx(normal["offload_ratio"].tolist())
+    assert side["y"].tolist() == pytest.approx(normal["accuracy"].tolist())
+    assert list(side["label"]) == ["edge m1", "cloud", "hybrid m1", "random m1"]
+    assert side.loc[side["strategy"] == "edge", "x"].tolist() == [0.0]
+    assert side.loc[side["strategy"] == "cloud", "x"].tolist() == [1.0]
+    assert side.loc[side["strategy"] == "random", "x"].tolist() == [0.5]

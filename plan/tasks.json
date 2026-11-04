@@ -194,8 +194,8 @@
         "T011"
       ],
       "size": "M",
-      "status": "todo",
-      "notes": ""
+      "status": "done",
+      "notes": "make_figures in analyze.py: 4 figures PNG(300dpi)+PDF, fig3_tradeoff.csv side-file; missing data -> warning + what exists."
     },
     {
       "id": "T013",
