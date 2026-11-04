@@ -260,37 +260,64 @@
       ],
       "depends_on": [
         "T014",
-        "T015"
+        "T015",
+        "T017",
+        "T018",
+        "T019"
       ],
       "size": "M",
       "status": "blocked",
-      "notes": "Waiting on Dk's Mac run (human task, after T014/T015). Cloud sessions: don't pick it or change its status. Dk sets it done with the PROGRESS entry."
+      "notes": "Waiting on Dk's Mac run (human task, after T014/T015/T017–T019). Cloud sessions: don't pick it or change its status. Dk sets it done with the PROGRESS entry."
     },
     {
       "id": "T017",
       "title": "Record the resolved random ratio in meta.json",
       "milestone": "M4",
-      "brief": "",
-      "requirements": [],
+      "brief": "plan/tasks/T017-random-ratio-in-meta.md",
+      "requirements": [
+        "R6",
+        "R10",
+        "R13"
+      ],
       "depends_on": [
         "T013"
       ],
       "size": "S",
-      "status": "proposed",
-      "notes": "From T010: the ratio RandomRouter resolves (from --ratio or the hybrid CSV) isn't saved, and if the hybrid CSV changes between a run and its resume, k and the cloud set change. Log the ratio and its source in <csv>.meta.json and warn on resume if it differs."
+      "status": "todo",
+      "notes": ""
     },
     {
       "id": "T018",
       "title": "Count a failed stage-2 edge sample's time in total_s",
       "milestone": "M4",
-      "brief": "",
-      "requirements": [],
+      "brief": "plan/tasks/T018-failed-sample-time.md",
+      "requirements": [
+        "R4",
+        "R7"
+      ],
       "depends_on": [
-        "T013"
+        "T017"
       ],
       "size": "S",
-      "status": "proposed",
-      "notes": "From T009: a stage-2 sample that raises ClientError (e.g. a timeout) is left out of total_s and edge_calls (ARCH §7 'completed calls'), which understates hybrid latency on timeouts. Decide in /replan whether to count its elapsed time."
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "id": "T019",
+      "title": "Fix the open README, checklist and doc-test findings from the T013 code review",
+      "milestone": "M4",
+      "brief": "plan/tasks/T019-doc-review-fixes.md",
+      "requirements": [
+        "R9",
+        "R10",
+        "R11"
+      ],
+      "depends_on": [
+        "T018"
+      ],
+      "size": "S",
+      "status": "todo",
+      "notes": ""
     }
   ]
 }

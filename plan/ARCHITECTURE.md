@@ -82,7 +82,7 @@ edge:
   hybrid_model: qwen2.5:3b
   timeout_s: 300
   memory_sample_hz: 10
-  warmup_max_tokens: 1        # ADDED BY T015 (not in config.yaml before it): one unrecorded edge call before a run's first question; <= 0 = off
+  warmup_max_tokens: 1        # one unrecorded edge call before a run's first question; <= 0 = off (T015)
 cloud:
   base_url: https://api.groq.com/openai/v1
   model: llama-3.3-70b-versatile
@@ -133,6 +133,7 @@ class Decision:                   # router output
     agreement: int | None         # number of agreeing edge samples (stage 2 only)
     edge_generations: tuple[Generation, ...]
     edge_answer: str | None       # majority answer when route == "edge"
+    failed_edge_s: tuple[tuple[int, float], ...] = ()   # (T018) per failed stage-2 sample: (samples completed before it, seconds it took)
 
 @dataclass(frozen=True)
 class Result:                     # one CSV row (field order = CSV column order)
@@ -210,6 +211,8 @@ class Strategy(ABC):
     @abstractmethod
     def prepare(self, questions: list[Question]) -> None:                # NOT abstract: default no-op (RandomRouter overrides)
         return None
+    def meta(self) -> dict:              # (T017) NOT abstract, default {}: written to meta.json["strategy"] when a run starts
+    def restore(self, recorded: dict) -> None:   # (T017) NOT abstract, default no-op: called with meta.json["strategy"] before prepare() on a resume
     @abstractmethod
     def answer(self, q: Question) -> tuple[str, list[Generation], dict]   # (final text, all generations in call order, extra row fields)
 class StrategyError(Exception):          # a ClientError inside answer(); keeps the calls that did complete
@@ -249,7 +252,7 @@ Exit codes: 0 success, 1 user error (including argparse usage errors, via `eclm.
 ## 6. Measurement rules
 - **TTFT / total:** `time.perf_counter()` immediately before sending the HTTP request. TTFT is taken at the first chunk with non-empty content, total when the stream ends.
 - **Tokens/s:** Ollama uses its final chunk: `eval_count / (eval_duration / 1e9)`. Cloud uses `usage.completion_tokens` (request `stream_options={"include_usage": True}`) divided by (total − TTFT). If usage is missing, it falls back to counting chunks.
-- **Strategy totals:** a row's `total_s` is the sum of all its calls' `total_s`. Its `ttft_s` is the sum of `total_s` of all calls before the answering call plus that call's `ttft_s`. `output_tokens` and `tokens_per_s` are the answering call's (for an edge-kept hybrid row: the first stage-2 sample whose answer equals the majority).
+- **Strategy totals:** a row's `total_s` is the sum of all its calls' `total_s`. Its `ttft_s` is the sum of `total_s` of all calls before the answering call plus that call's `ttft_s`. `output_tokens` and `tokens_per_s` are the answering call's (for an edge-kept hybrid row: the first stage-2 sample whose answer equals the majority). A failed stage-2 sample's time (`Decision.failed_edge_s`) is added to `total_s`, and to `ttft_s` when it happened before the answering call; `edge_calls` still counts completed calls (T018).
 - **Warm-up (T015):** before the first question of a run with an edge client (edge, hybrid, random), the runner makes one call `build_prompt(WARMUP_QUESTION, mock=mock)` at temperature 0 with `max_tokens = edge.warmup_max_tokens` (<= 0 = off). It writes no row, isn't memory-sampled and isn't counted anywhere (its duration is only logged), and a failure is only a warning. Cloud clients aren't warmed up, so a cloud run's first row includes connection setup (accepted).
 - **Seeds:** every call passes a seed (Ollama `options.seed`, Groq `seed`): `settings.seed` for temperature-0 calls, `settings.seed + k` for the k-th stage-2 sample.
 - **Memory:** `MemorySampler` wraps every edge call. The row's `peak_mem_gb` is the max over the question's edge calls. It's blank for cloud-only rows.
@@ -260,7 +263,7 @@ Exit codes: 0 success, 1 user error (including argparse usage errors, via `eclm.
 - **Budget:** `run.py` wraps the cloud client in `BudgetedClient(max_calls_per_run)`, which raises `BudgetExceeded` *before* a call that would exceed the budget. The runner then discards the unfinished question (no row), flushes and exits 2. A restart resumes with a fresh budget. A question never makes a partial over-budget call.
 - **Logging:** `logging` at INFO to stderr, one line per run start/end plus warnings. tqdm progress bar to stderr. The API key is never logged.
 - **Secrets:** `.env` (git-ignored), with `.env.example` committed.
-- **Run metadata:** next to each CSV, `<same name>.meta.json` = `{run_id, started_at, args, config snapshot (no secrets), system_info}`.
+- **Run metadata:** next to each CSV, `<same name>.meta.json` = `{run_id, started_at, args, config snapshot (no secrets), system_info, strategy}`. `strategy` is `Strategy.meta()`: for random `{ratio, ratio_source, cloud_questions, questions}`, else `{}` (T017). A resumed random run keeps its recorded ratio, so its cloud set never changes mid-file.
 - **Determinism:** `random.Random(settings.seed)` for selection. The random router uses `Random(seed)` over sorted qids.
 
 ## 8. Testing & `scripts/verify.sh`

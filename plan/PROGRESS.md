@@ -1,9 +1,9 @@
 # Progress
 
 ## Project state
-- Phase: **M1 complete** (T001–T003), **M2 complete** (T004–T007). **M3 complete** (T008–T010). M4: T011–T015 done, T016 blocked (waiting on Dk's Mac run), T017–T018 proposed. Next: Dk runs T016 (docs/MAC_CHECKLIST.md on the Mac), then the full experiment. PRs build → main for M1/M2 are still pending.
+- Phase: **M1 complete** (T001–T003), **M2 complete** (T004–T007). **M3 complete** (T008–T010). M4: T011–T015 done, T017–T019 todo, T016 blocked (waiting on Dk's Mac run). Next: T017, T018, T019, then Dk runs T016 (docs/MAC_CHECKLIST.md on the Mac), then the full experiment. PRs build → main for M1/M2 are still pending.
 - Spec: plan/SPEC.md (R1–R13, N1–N6). Architecture: plan/ARCHITECTURE.md. ADRs 0001–0006.
-- 18 tasks in 4 milestones: M1 mock pipeline (T001–T003) · M2 real backends (T004–T007) · M3 hybrid + random (T008–T010) · M4 analysis, run guide, Mac checks (T011–T018). T016 is a human task, kept `blocked` so cloud sessions skip it.
+- 19 tasks in 4 milestones: M1 mock pipeline (T001–T003) · M2 real backends (T004–T007) · M3 hybrid + random (T008–T010) · M4 analysis, run guide, Mac checks (T011–T019). T016 is a human task, kept `blocked` so cloud sessions skip it.
 - Workflow: one task per fresh Claude Code cloud session via /next-task, commits on `build`, pushed after each task. Milestones merged to `main` via PR reviewed by Dk.
 - Real Ollama/Groq can't be reached from cloud sessions. They're tested via fake transports and verified on Dk's Mac with docs/MAC_CHECKLIST.md (written in T013, run in T016).
 - Deadlines: cloud credit expires 2026-11-05 02:59 EST · final presentation 2026-12-02/09 · report due 2026-12-10.
@@ -130,3 +130,8 @@
 - Decisions: the warm-up goes to the raw `ctx.edge` client, so it never reaches a MemorySampler or BudgetedClient. Its duration is only logged. A resumed run warms up again; a complete run doesn't (the early return comes first). In `--all`, qwen2.5:3b warms up 3 times (edge, hybrid, random).
 - Verified: verify.sh PASS (304 tests). AC1: a recording wrapper over the mock clients shows the first edge call is the warm-up prompt at temperature 0 with max_tokens 1, unsampled (a flag set by a patched `strategies.memory_sampler`), with exactly one warm-up and one row per question, for edge, hybrid and random. AC2: cloud makes no edge call and fits a budget of exactly n calls; 0 and -1 turn it off; a complete run makes no call; a resume warms up again. AC3: a ClientError on the warm-up → one warning, all rows written, no error cells. AC4: `--all --mock` with vs without the warm-up gives identical qid/ran_on/predicted/correct in all 6 CSVs. AC5: checklist read. AC6: smoke checks pass, and with `warmup_max_tokens: 0` in a copied config the `in_log` check fails. Mutation: commenting out the call fails 6 of the 10 tests. By hand: the warm-up line prints before the progress bar.
 - Follow-ups (/replan): ARCH §4's comment "ADDED BY T015 (not in config.yaml before it)" can now be shortened.
+
+## 2026-11-04 · REPLAN · Promote T017/T018, add T019 review fixes · DONE
+- Did: Dk approved all open items ("complete the full project, I approve all"). T017 (random ratio in meta.json, kept on resume) and T018 (failed stage-2 sample time counted in hybrid latency) got briefs and are todo. New T019 fixes the 7 open findings from the T013 code review. T016 (Dk's Mac run) now waits for T017–T019 too, so the checklist runs on the final code.
+- Decisions: T017 adds non-abstract `Strategy.meta()`/`restore()` and meta.json["strategy"]; a resumed random run keeps its recorded ratio and warns if the source changed. T018 counts the failed sample's time in total_s (and ttft_s when it came before the answering call) through a new `Decision.failed_edge_s`; `edge_calls` stays completed calls.
+- Architecture: §4 comment shortened, §5 Decision/Strategy contracts, §6 failed-sample timing, §7 meta.json `strategy` key.
