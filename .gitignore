@@ -16,3 +16,8 @@ results/
 figures/
 models/
 .verify_tmp/
+
+# scratch folders from the README quick test and the Mac checklist
+mock_test/
+smoke_results/
+smoke_figures/
