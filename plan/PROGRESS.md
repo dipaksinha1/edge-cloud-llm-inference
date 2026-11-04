@@ -1,11 +1,11 @@
 # Progress
 
 ## Project state
-- Phase: **M1 complete** (T001–T003), **M2 complete** (T004–T007). **M3 complete** (T008–T010). **M4 complete** (T011–T013). All 13 planned tasks done (T014 proposed). Next: Dk runs docs/MAC_CHECKLIST.md on the Mac, then the full experiment. PRs build → main for M1/M2 are still pending.
+- Phase: **M1 complete** (T001–T003), **M2 complete** (T004–T007). **M3 complete** (T008–T010). M4: T011–T013 done, T014–T016 todo. Next: T014 (CLI exit codes), then T015 (edge warm-up), then T016 (Dk runs docs/MAC_CHECKLIST.md on the Mac), then the full experiment. PRs build → main for M1/M2 are still pending.
 - Spec: plan/SPEC.md (R1–R13, N1–N6). Architecture: plan/ARCHITECTURE.md. ADRs 0001–0006.
-- 13 tasks in 4 milestones: M1 mock pipeline (T001–T003) · M2 real backends (T004–T007) · M3 hybrid + random (T008–T010) · M4 analysis + run guide (T011–T013).
+- 16 tasks in 4 milestones: M1 mock pipeline (T001–T003) · M2 real backends (T004–T007) · M3 hybrid + random (T008–T010) · M4 analysis, run guide, Mac checks (T011–T016). T016 is a human task: cloud sessions report NEEDS_HUMAN on it.
 - Workflow: one task per fresh Claude Code cloud session via /next-task, commits on `build`, pushed after each task. Milestones merged to `main` via PR reviewed by Dk.
-- Real Ollama/Groq can't be reached from cloud sessions. They're tested via fake transports and verified on Dk's Mac with docs/MAC_CHECKLIST.md (T013).
+- Real Ollama/Groq can't be reached from cloud sessions. They're tested via fake transports and verified on Dk's Mac with docs/MAC_CHECKLIST.md (written in T013, run in T016).
 - Deadlines: cloud credit expires 2026-11-05 02:59 EST · final presentation 2026-12-02/09 · report due 2026-12-10.
 - Open question Q1 (router threshold tuning) is deferred until real results exist.
 
@@ -110,3 +110,9 @@
 - Gotchas: `router train` prints nothing for 20–60 min (no progress bar). `--limit 5` only covers GSM8K (test set is GSM8K first). `data/` was never committed, so README now says `git add data`. `eclm.data`/`eclm.analyze` use stock argparse, so bad flags exit 2 (clashes with the budget code; noted in README).
 - Verified: AC1 by extracting the README mock block and running it with `env -i bash -e` (exit 0, 16 result files, 9 figure files). AC2 by the new test (24 commands; a deliberately broken flag made it fail). AC3 read; reviewer checked pf/tc/clumsy syntax. AC4 verify.sh PASS. Both checklist Python snippets ran with mock clients substituted. Reviewer round 1: FAIL (no progress bar in router training; N5 timing order bias). Both fixed, plus 4 non-blocking items. Round 2: PASS; its pf-token copy-paste and first-row warm-up notes were also applied.
 - Follow-ups: proposed T015 (the first edge row of each run includes the model load in ttft_s/total_s). Proposed T014 (`eclm.data`/`eclm.analyze` exit 1 on usage errors, like run/router). Network Link Conditioner may shape localhost; the checklist's step 6 detects it.
+
+## 2026-11-04 · REPLAN · Promote T014/T015, add T016 Mac checklist run · DONE
+- Did: Dk approved the proposed T014 and T015. Wrote their briefs and promoted them to todo. Added T016 (Dk runs docs/MAC_CHECKLIST.md on the Mac, after T014/T015, so the checklist runs on the final timing code).
+- Decisions (Dk): T015 warms up edge models only (one untimed call per run, before question 1, with the prompt template on a fixed dummy question). Cloud row 1's connection setup is accepted. T014 adds a shared `eclm.cli.ArgumentParser` that replaces the two private `_Parser` copies.
+- Architecture: §3 adds cli.py. §4 adds `edge.warmup_max_tokens: 1` (0 = off). §5 records the existing `mock=` keyword on train_router and Router, `analyze --config`, and the exit-1 usage errors. §6 adds the warm-up rule and says "answering call" (as built in T009). These were drift items from the T008/T009/T011 PROGRESS entries.
+- Not changed: SPEC and ADRs. Still open: the T010 follow-up (record the resolved random ratio in meta.json) and Q1 (router threshold).

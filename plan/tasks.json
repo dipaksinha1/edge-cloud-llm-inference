@@ -216,29 +216,55 @@
     },
     {
       "id": "T014",
-      "title": "data and analyze exit 1 on usage errors",
+      "title": "Usage errors exit 1 in every CLI",
       "milestone": "M4",
-      "brief": "",
-      "requirements": [],
+      "brief": "plan/tasks/T014-cli-exit-codes.md",
+      "requirements": [
+        "N3"
+      ],
       "depends_on": [
         "T013"
       ],
       "size": "S",
-      "status": "proposed",
-      "notes": "eclm.data/eclm.analyze use stock argparse, so a bad flag exits 2, which ARCH §5/§7 reserve for the cloud budget. Reuse run.py's _Parser (exit 1). Found in T013 review."
+      "status": "todo",
+      "notes": ""
     },
     {
       "id": "T015",
-      "title": "Warm up edge models before timed questions",
+      "title": "Warm up the edge model before a run's first timed question",
       "milestone": "M4",
-      "brief": "",
-      "requirements": [],
+      "brief": "plan/tasks/T015-edge-warmup.md",
+      "requirements": [
+        "R2",
+        "R7"
+      ],
       "depends_on": [
-        "T013"
+        "T014"
       ],
       "size": "S",
-      "status": "proposed",
-      "notes": "Nothing loads the Ollama model before the first timed call, so row 1 of each edge/hybrid run (and the first row after a model switch in --all) includes the model load time in ttft_s/total_s. Consider one untimed warm-up generate per edge model before the first question (needs an ARCH §6 rule, via /replan). Found in T013 review."
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "id": "T016",
+      "title": "Run the Mac real-backend checklist (Dk, on the Mac)",
+      "milestone": "M4",
+      "brief": "plan/tasks/T016-mac-checklist-run.md",
+      "requirements": [
+        "R1",
+        "R2",
+        "R3",
+        "R7",
+        "R13",
+        "N5"
+      ],
+      "depends_on": [
+        "T014",
+        "T015"
+      ],
+      "size": "M",
+      "status": "todo",
+      "notes": "Human task: Dk runs docs/MAC_CHECKLIST.md on the Mac. A cloud /next-task session must not attempt it; report RESULT: NEEDS_HUMAN."
     }
   ]
 }

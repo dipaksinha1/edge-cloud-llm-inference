@@ -41,6 +41,7 @@ scripts/verify.sh
 src/eclm/
   __init__.py
   config.py          Settings loader (config.yaml + .env + CLI overrides)
+  cli.py             ArgumentParser whose usage errors exit 1, used by every CLI module (T014)
   types.py           Question, Generation, Result, Decision dataclasses (§5)
   prompts.py         build_prompt(question) -> str
   data.py            dataset builder CLI (R1)
@@ -81,6 +82,7 @@ edge:
   hybrid_model: qwen2.5:3b
   timeout_s: 300
   memory_sample_hz: 10
+  warmup_max_tokens: 1        # one untimed edge call before a run's first question; 0 = off (T015)
 cloud:
   base_url: https://api.groq.com/openai/v1
   model: llama-3.3-70b-versatile
@@ -194,10 +196,10 @@ def save_questions(qs: list[Question], path: Path) -> None   # JSONL, sorted key
 FEATURES = ["n_words", "n_numbers", "n_math_ops", "is_mmlu", "subject_stem", "subject_humanities", "subject_social", "subject_other", "max_number_digits"]
 def features(q: Question) -> list[float]                     # order = FEATURES
 SUBJECT_GROUPS: dict[str, str]   # all 57 MMLU subjects -> stem|humanities|social|other, per the official MMLU categories (hendrycks/test categories.py); unknown subject -> other
-def train_router(settings, edge: ModelClient, calibration: list[Question]) -> RouterModel
+def train_router(settings, edge: ModelClient, calibration: list[Question], *, mock: bool = False) -> RouterModel  # mock: prompts carry the gold marker
 class RouterModel:  # wraps sklearn LogisticRegression (class_weight="balanced"); save(path)/load(path) via joblib; predict_hard(q) -> float
 class Router:
-    def __init__(self, model: RouterModel, edge: ModelClient, settings: Settings): ...
+    def __init__(self, model: RouterModel, edge: ModelClient, settings: Settings, *, mock: bool = False): ...
     def decide(self, q: Question) -> Decision
 # model file: models/router_<safe_name(edge_model)>.joblib
 
@@ -232,15 +234,16 @@ python -m eclm.data   [--config config.yaml] [--mock]
 python -m eclm.router train --edge-model M [--config ...] [--mock]
 python -m eclm.run    --strategy {edge,cloud,hybrid,random} [--edge-model M] --network {normal,degraded}
                       [--ratio R] [--limit N] [--all] [--mock] [--config ...] [--results-dir DIR]
-python -m eclm.analyze [--results-dir DIR] [--figures-dir DIR]     # no --mock: it only reads CSVs
+python -m eclm.analyze [--results-dir DIR] [--figures-dir DIR] [--config ...]     # no --mock: it only reads CSVs
 ```
-Exit codes: 0 success, 1 user error or backend unavailable, 2 budget reached (resumable).
+Exit codes: 0 success, 1 user error (including argparse usage errors, via `eclm.cli.ArgumentParser`) or backend unavailable, 2 budget reached (resumable).
 **Mock mode:** `python -m eclm.data --mock` writes the fixture's fixed disjoint split (`eclm.data.mock_questions() -> (test, calibration)`, half GSM8K/half MMLU each) to `data_dir` in the normal file format. `run --mock` and `router --mock` then read `data_dir` exactly like real runs (same loader), but build `MockClient`s named after the requested models (`mock_accuracy` above), and edge memory is sampled on the current process pid.
 
 ## 6. Measurement rules
 - **TTFT / total:** `time.perf_counter()` immediately before sending the HTTP request. TTFT is taken at the first chunk with non-empty content, total when the stream ends.
 - **Tokens/s:** Ollama uses its final chunk: `eval_count / (eval_duration / 1e9)`. Cloud uses `usage.completion_tokens` (request `stream_options={"include_usage": True}`) divided by (total − TTFT). If usage is missing, it falls back to counting chunks.
-- **Strategy totals:** a row's `total_s` is the sum of all its calls' `total_s`. Its `ttft_s` is the sum of `total_s` of all calls before the answering call plus that call's `ttft_s`. `output_tokens` is the final call's. `tokens_per_s` is the final call's.
+- **Strategy totals:** a row's `total_s` is the sum of all its calls' `total_s`. Its `ttft_s` is the sum of `total_s` of all calls before the answering call plus that call's `ttft_s`. `output_tokens` and `tokens_per_s` are the answering call's (for an edge-kept hybrid row: the first stage-2 sample whose answer equals the majority).
+- **Warm-up (T015):** before the first question of a run with an edge client (edge, hybrid, random), the runner makes one untimed call `build_prompt(WARMUP_QUESTION)` at temperature 0 with `max_tokens = edge.warmup_max_tokens` (0 = off). It writes no row, isn't memory-sampled, and a failure is only a warning. Cloud clients aren't warmed up, so a cloud run's first row includes connection setup (accepted).
 - **Seeds:** every call passes a seed (Ollama `options.seed`, Groq `seed`): `settings.seed` for temperature-0 calls, `settings.seed + k` for the k-th stage-2 sample.
 - **Memory:** `MemorySampler` wraps every edge call. The row's `peak_mem_gb` is the max over the question's edge calls. It's blank for cloud-only rows.
 - **Offload ratio** (analysis): rows with `ran_on == "cloud"` ÷ rows.
