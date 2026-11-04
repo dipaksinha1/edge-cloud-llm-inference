@@ -29,7 +29,7 @@ FENCE = re.compile(r"^[ \t]*```[^\n]*\n(.*?)^[ \t]*```", re.MULTILINE | re.DOTAL
 SEPARATORS = {"&&", "||", ";", "|"}
 # redirection and background operators as shlex(punctuation_chars=True) emits them; words after one aren't argv
 REDIRECTS = {">", ">>", "<", "<<", ">&", "&>", "&>>", "<&", ">|", "&"}
-HEREDOC = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_]\w*)\1")
+HEREDOC = re.compile(r"(?<!<)<<-?\s*(['\"]?)([A-Za-z_]\w*)\1")  # not a <<< here-string
 ECLM_MODULE = re.compile(r"eclm(\.\w+)*")
 
 
@@ -146,8 +146,12 @@ def test_extractor_skips_heredoc_bodies() -> None:
         "it's python -m eclm.analyze --bogus",
         "EOF",
         "python -m eclm.analyze",
+        "cat <<<word",  # a here-string has no body: the next line is still a command
+        "python -m eclm.run --all --network normal",
     )
-    assert eclm_commands(text) == [["eclm.data", "--mock"], ["eclm.analyze"]]
+    assert eclm_commands(text) == [
+        ["eclm.data", "--mock"], ["eclm.analyze"], ["eclm.run", "--all", "--network", "normal"]
+    ]
 
 
 def test_docs_cover_every_cli() -> None:

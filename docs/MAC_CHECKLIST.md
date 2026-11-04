@@ -198,7 +198,7 @@ Expected: 12 lines (3 edge models + cloud, 3 questions each).
 
 The smoke runs above use only one edge model, so check the labels on the mock figures instead: the mock models carry the real names, so all three edge models are on the axes. Run the README quick test again (about a minute, it starts with `rm -rf mock_test`), then:
 
-- [ ] Open `mock_test/figures/*.png`: the x-axis labels (`qwen2.5:3b`, `qwen2.5:0.5b`, `llama3.2:1b`, cloud, hybrid, random) don't overlap or get cut off.
+- [ ] Open `mock_test/figures/*.png`: the labels don't overlap or get cut off. fig1 and fig2 label bars `edge llama3.2:1b`, `edge qwen2.5:0.5b`, `edge qwen2.5:3b`, `cloud`, `hybrid qwen2.5:3b`, `random qwen2.5:3b`; fig4 uses the bare model names (`qwen2.5:3b`, `qwen2.5:0.5b`, `llama3.2:1b`).
 - [ ] Delete the folder afterwards: `rm -rf mock_test`.
 
 ## 9. Clean up and record
